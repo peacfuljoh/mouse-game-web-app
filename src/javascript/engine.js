@@ -374,9 +374,8 @@ function level_up(lvl=-1) {
     objectsInfo = new Objects(board);
 
     // update game info
-    if (lvl == -1) {
-        update_score();
-    }
+    if   (lvl == -1) { update_score(); }
+    else             { update_score(Math.floor(time_left * timeToScoreFactor)); }
 
     // reset timer
     time_left = INIT_TIME + 1;

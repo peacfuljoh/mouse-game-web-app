@@ -22,5 +22,6 @@ const ID_RANGE_CAT = [451, 500];
 
 const INIT_TIME = 120;
 
-const VAL_CHEESE = 50;
+const VAL_CHEESE = 20;
 
+const timeToScoreFactor = 0.2;
