@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Mouse Game</title>
+    <link rel="stylesheet" href="src/css/styles.css">
+</head>
+<body>
+
+<div class="container">
+    <div>
+        <h1 class="main-title">Mouse</h1>
+    </div>
+
+    <div class="upper-panel">
+        <button class="new-game-button" onclick="start_new_game()">New game</button>
+        <p></p>
+        <p class="score">Score: 0</p>
+    </div>
+
+    <div class="play-area">
+        <img id="play-grid" height="600px" src="assets/play_grid.png">
+        <img id="mouse-icon" height="20px" src="assets/mouse_icon.png">
+<!--        <img id="blocks2" src="assets/block.png" style="top:150px; left:210px;">-->
+        <div id="blocks-div">
+            <!-- block code inserted here and updated dynamically -->
+        </div>
+    </div>
+</div>
+
+</body>
+
+<script src="src/javascript/engine.js"></script>
+
+</html>

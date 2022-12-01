@@ -1,0 +1,41 @@
+.container {
+    margin: 50px 20%;
+}
+
+.main-title {
+    text-align: center;
+    color: black;
+    margin: 30px 0px;
+}
+
+.upper-panel {
+/*    height: 30px; */
+    display: grid;
+    grid-template-columns: 20% 50% 30%;
+}
+
+.new-game-button {
+    color: black;
+}
+
+.score {
+    color: green;
+    text-align: left;
+}
+
+.play-area {
+    position: relative;
+    margin: 20px 0 0 0;
+}
+
+#play-grid {
+    z-order: 0;
+}
+
+#mouse-icon {
+    z-order: 10;
+    top: 5px;
+    left: 10px;
+    position: absolute;
+}
+
