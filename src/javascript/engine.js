@@ -1,17 +1,10 @@
 // global constants
-const GRIDSIZE = [20, 20]; // height, width
+let timer;
+let trapped;
 
-const MOUSE_PX_LEFT0 = 10;
-const MOUSE_PX_TOP0 = 5;
-const MOUSE_PX_PER_CELL = 30;
-
-const BLOCK_PX_LEFT0 = 2;
-const BLOCK_PX_TOP0 = 2;
-const BLOCK_PX_PER_CELL = 29.95;
-
-const INIT_LVL = 0;
-
-const SYMBOL_BLOCK = "B";
+// game state
+let time_left;
+let LVL = 0;
 
 
 // elements
@@ -19,47 +12,31 @@ const MOUSE_ICON = document.getElementById('mouse-icon');
 const BLOCKS_DIV = document.getElementById('blocks-div');
 
 
-// block position starting lists for all game levels
-const BLOCK_POS_LIST = [
-    [2, 3], [5, 7], [13, 6], [5, 2], [18, 10],
-    [4, 17], [14, 17], [15, 13], [11, 11], [11, 19],
-    [0, 19], [19, 0], [19, 19], [0, 1]
-];
 
-const BLOCK_BIN_MASK = [
-    "--------------------",
-    "--------------------",
-    "---------BBBB-------",
-    "---------BBBB-------",
-    "-----BBBBBBBB-------",
-    "--------BBBBB-BB----",
-    "--------------------",
-    "---------BBBBB------",
-    "----BBBBBBB---------",
-    "--------------------",
-    "--------------------",
-    "--------------------",
-    "--------------------",
-    "--------------------",
-    "--------------------",
-    "--------------------",
-    "--------------------",
-    "--------------------",
-    "--------------------",
-    "--------------------"
-];
+// state objects
+let mouseInfo;
+let objectsInfo;
 
 
 // classes
 class Mouse {
-    constructor(vpos=0, hpos=0) {
-        this.pos = [vpos, hpos]; // vertical, horizontal
+    constructor(vpos=0, hpos=0, blockBinMask=null) {
+        this.pos = [vpos, hpos];
+        if (blockBinMask != null) {
+            for (let i = 0; i < GRIDSIZE[0]; i++) {
+                let j = blockBinMask[i].indexOf("M");
+                if (j != -1) {
+                    this.pos = [i, j];
+                    break;
+                }
+            }
+        }
         this.dir = 0;
         this.updateIcon();
     }
     move(dir_) {
         let next_pos;
-        let onEdge = false;
+        let onEdge = false; // trying to move across grid boundary
 
         // infer movement direction and next position
         switch(dir_) {
@@ -101,17 +78,25 @@ class Mouse {
 
         // if not boundary-constrained, check if move is possible
         if (!onEdge) {
-            if (!blocksInfo.hasBlock(next_pos)) { // space is free
+            if (objectsInfo.hasCheese(next_pos)) {
+                update_score(VAL_CHEESE);
+                objectsInfo.remove(next_pos);
                 this.pos = next_pos;
             }
-            else if (blocksInfo.canPush(next_pos, dir_)) {
-                blocksInfo.pushBlocks(next_pos, dir_);
+            else if (!objectsInfo.hasBlock(next_pos) || objectsInfo.hasCat(next_pos)) { // space is free or has cat
+                this.pos = next_pos;
+            }
+            else if (objectsInfo.canPush(next_pos, dir_)) { // blocks in the way
+                objectsInfo.pushObjects(next_pos, dir_);
                 this.pos = next_pos;
             }
         }
 
         // update icon
         this.updateIcon();
+        if (!objectsInfo.anyCheeseRemaining()) {
+            level_up(LVL + 1);
+        }
     }
     updateIcon() {
         MOUSE_ICON.style.transform = 'rotate(' + (90 * this.dir).toString() + 'deg)'
@@ -120,66 +105,82 @@ class Mouse {
     }
 }
 
-class Blocks {
-    constructor(blockPosList=null, blockBinMask=null) {
-        // initialize block mask
-        this.blockMask = [];
-        for (let i = 0; i < GRIDSIZE[0]; i++) {
-            this.blockMask.push([]);
-            for (let j = 0; j < GRIDSIZE[1]; j++) {
-                this.blockMask[i].push(0);
-            }
-        }
 
-        // populate block mask from list or binary mask
-        if (blockPosList != null) {
-            let n = 1;
-            for (let blockPos of blockPosList) {
-                this.blockMask[blockPos[0]][blockPos[1]] = n;
-                n += 1;
-            }
-        }
-        else if (blockBinMask != null) {
-            let n = 1;
-            for (let i = 0; i < GRIDSIZE[0]; i++) {
-                for (let j = 0; j < GRIDSIZE[1]; j++) {
-                    if (blockBinMask[i][j] == SYMBOL_BLOCK) {
-                        this.blockMask[i][j] = n;
-                        n += 1;
-                    }
+class Objects {
+    constructor(lvl_layout) {
+        // init block mask
+        this.catPos = {};
+        this.objMask = [];
+        this.initObjMask(lvl_layout);
+        this.draw();
+    }
+    initObjMask(lvl_layout) {
+        let n_empty = 0; // empty cells
+        let n_block = ID_RANGE_BLOCK[0]; // 1 through 400
+        let n_cheese = ID_RANGE_CHEESE[0]; // 401 through 450
+        let n_cat = ID_RANGE_CAT[0]; // 451 through 500
+        for (let i = 0; i < GRIDSIZE[0]; i++) {
+            this.objMask.push([]);
+            for (let j = 0; j < GRIDSIZE[1]; j++) {
+                if (lvl_layout[i][j] == SYMBOL_BLOCK) {
+                    this.objMask[i].push(n_block);
+                    n_block += 1;
+                }
+                else if (lvl_layout[i][j] == SYMBOL_CHEESE) {
+                    this.objMask[i].push(n_cheese);
+                    n_cheese += 1;
+                }
+                else if (lvl_layout[i][j] == SYMBOL_CAT) {
+                    this.objMask[i].push(n_cat);
+                    this.catPos[n_cat] = [i, j];
+                    n_cat += 1;
+                }
+                else {
+                    this.objMask[i].push(n_empty);
                 }
             }
         }
-        else {
-            // error
-        }
-        this.draw();
     }
     draw() {
-        let n = 0;
+        let n;
         let text = '';
         for (let i = 0; i < GRIDSIZE[0]; i++) {
             for (let j = 0; j < GRIDSIZE[1]; j++) {
-                if (this.blockMask[i][j]) {
-                    text += this.addBlock(i, j);
+                n = this.objMask[i][j];
+                if (n != 0) {
+                    if (n >= ID_RANGE_BLOCK[0] && n <= ID_RANGE_BLOCK[1]) {
+                        text += this.addObjectText(i, j, "block");
+                    }
+                    else if (n >= ID_RANGE_CHEESE[0] && n <= ID_RANGE_CHEESE[1]) {
+                        text += this.addObjectText(i, j, "cheese");
+                    }
+                    else if (n >= ID_RANGE_CAT[0] && n <= ID_RANGE_CAT[1]) {
+                        text += this.addObjectText(i, j, "cat");
+                    }
                 }
             }
         }
         BLOCKS_DIV.innerHTML = text;
     }
-    addBlock(i, j) {
+    addObjectText(i, j, type) {
         let top = BLOCK_PX_TOP0 + i * BLOCK_PX_PER_CELL;
         let left = BLOCK_PX_LEFT0 + j * BLOCK_PX_PER_CELL;
-        let n = this.blockMask[i][j];
+        if (type == "cheese") { top += 2; }
+        let n = this.objMask[i][j];
 
         let text = '';
-        text += '<img id="block' + n.toString() + '" src="assets/block.png"';
+        text += '<img id="object' + n.toString() + '" src=';
+        if      (type == "block")  { text += '"assets/block.png"';  }
+        else if (type == "cheese") { text += '"assets/cheese.png"'; }
+        else if (type == "cat")    { text += '"assets/cat.png"';    }
         text += ' style="';
         text += ' top:' + top.toString() + 'px;';
         text += ' left:' + left.toString() + 'px;';
         text += ' position:absolute;';
         text += ' border-radius:20%;';
-        text += ' height:26px;';
+        if      (type == "block")  { text += ' height:26px;'; }
+        else if (type == "cheese") { text += ' height:18px;'; }
+        else if (type == "cat")    { text += ' height:24px;'; }
         text += ' z-order:5;'
         text += '"';
         text += '>';
@@ -187,8 +188,10 @@ class Blocks {
 
         return text;
     }
+
+    // status check methods
     hasBlock(pos) {
-        return this.blockMask[pos[0]][pos[1]]
+        return this.objMask[pos[0]][pos[1]]
     }
     canPush(next_pos, dir_) {
         let canPush = false;
@@ -214,14 +217,46 @@ class Blocks {
             }
         }
         while (!canPush && i >= 0 && i <= GRIDSIZE[0] - 1 && j >= 0 && j <= GRIDSIZE[1] - 1) {
-            canPush ||= !Boolean(this.blockMask[i][j]);
+            canPush ||= !Boolean(this.objMask[i][j]);
             increment();
         }
 
         return canPush;
     }
-    pushBlocks(next_pos, dir_) {
-        let n, elem, increment, cond, i_inc, j_inc;
+    hasCheese(next_pos) {
+        let i = next_pos[0];
+        let j = next_pos[1];
+        let obj_id = this.objMask[i][j];
+        if (obj_id >= ID_RANGE_CHEESE[0] && obj_id <= ID_RANGE_CHEESE[1]) {
+            return true;
+        }
+        return false;
+    }
+    anyCheeseRemaining() {
+        let n;
+        for (let i = 0; i < GRIDSIZE[0]; i++) {
+            for (let j = 0; j < GRIDSIZE[1]; j++) {
+                n = this.objMask[i][j];
+                if (n >= ID_RANGE_CHEESE[0] && n <= ID_RANGE_CHEESE[1]) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+    hasCat(next_pos) {
+        let i = next_pos[0];
+        let j = next_pos[1];
+        let obj_id = this.objMask[i][j];
+        if (obj_id >= ID_RANGE_CAT[0] && obj_id <= ID_RANGE_CAT[1]) {
+            return true;
+        }
+        return false;
+    }
+
+    // action methods
+    pushObjects(next_pos, dir_) {
+        let increment, cond, i_inc, j_inc;
         let i = next_pos[0];
         let j = next_pos[1];
 
@@ -259,7 +294,7 @@ class Blocks {
 
         // search for the furthest-away block in the stack
         do {
-            if (!this.blockMask[i][j]) {
+            if (!this.objMask[i][j]) {
                 break;
             }
             increment(0);
@@ -267,22 +302,36 @@ class Blocks {
 
         // move blocks away in reverse distance-from-mouse order
         while (cond()) {
-            n = this.blockMask[i + i_inc][j + j_inc];
-            elem = document.getElementById("block" + n.toString());
-            elem.style.top = (BLOCK_PX_TOP0 + i * BLOCK_PX_PER_CELL).toString() + 'px';
-            elem.style.left = (BLOCK_PX_LEFT0 + j * BLOCK_PX_PER_CELL).toString() + 'px';
-            this.blockMask[i][j] = n;
-            this.blockMask[i + i_inc][j + j_inc] = 0;
+            this.move(i + i_inc, j + j_inc, i, j)
             increment(1);
         }
     }
+    move(i_start, j_start, i_end, j_end) {
+        // get object id and html element
+        let n, elem;
+        n = this.objMask[i_start][j_start];
+        elem = document.getElementById("object" + n.toString());
+
+        // update element
+        elem.style.top = (BLOCK_PX_TOP0 + i_end * BLOCK_PX_PER_CELL).toString() + 'px';
+        elem.style.left = (BLOCK_PX_LEFT0 + j_end * BLOCK_PX_PER_CELL).toString() + 'px';
+
+        // update mask
+        this.objMask[i_end][j_end] = n;
+        this.objMask[i_start][j_start] = 0;
+
+        // if cat, update its pos array
+        if (n >= ID_RANGE_CAT[0] && n <= ID_RANGE_CAT[1]) {
+            this.catPos[n] = [i_end, j_end];
+        }
+    }
+    remove(next_pos) {
+        let i = next_pos[0];
+        let j = next_pos[1];
+        this.objMask[i][j] = 0;
+        this.draw();
+    }
 }
-
-
-// objects
-let mouseInfo = new Mouse(Math.floor(0.75 * GRIDSIZE[0]), Math.floor(0.50 * GRIDSIZE[1]));
-//let blocksInfo = new Blocks({"blockPosList": BLOCK_POS_LIST});
-let blocksInfo = new Blocks(null, BLOCK_BIN_MASK);
 
 
 // callbacks
@@ -304,7 +353,94 @@ document.onkeypress = function(e) {
 }
 
 
-// functions
-function start_new_game() {
 
+
+// functions
+function game_over() {
+    level_up();
+}
+
+function level_up(lvl=-1) {
+    let board;
+
+    if   (lvl == -1) { LVL = 0; }
+    else             { LVL = lvl % (MAX_LVL + 1); }
+
+    // reset play objects
+    delete mouseInfo;
+    delete objectsInfo;
+    board = BLOCK_BIN_MASK[LVL];
+    mouseInfo = new Mouse(null, null, board);
+    objectsInfo = new Objects(board);
+
+    // update game info
+    if (lvl == -1) {
+        update_score();
+    }
+
+    // reset timer
+    time_left = INIT_TIME + 1;
+    if (timer != undefined) {
+        clearInterval(timer);
+    }
+    update_timer();
+    timer = setInterval(update_timer, 1000);
+
+    // set trap callback
+    if (trapped == undefined) {
+        trapped = setInterval(didCatTrapMouse, 100);
+    }
+}
+
+function update_timer() {
+    let elem = document.getElementById("timer");
+
+    // decrement timer
+    time_left -= 1;
+
+    // reset if timer ran out
+    if (time_left < 0) {
+        elem.style.color = "black";
+        game_over();
+        return;
+    }
+
+    // update text
+    let min = Math.floor(time_left / 60);
+    let sec = (time_left - min * 60);
+    let text = min.toString() + ":";
+    if (sec < 10) {
+        text += "0"
+    }
+    text += sec.toString();
+    elem.innerHTML = text;
+
+    // update color
+    if (time_left < 30) {
+        if (time_left <= 10) {
+            elem.style.color = "red";
+        } else {
+            elem.style.color = "#cc9900";
+        }
+    }
+}
+
+function update_score(incr=null) {
+    let elem = document.getElementById("score");
+    if (incr == null) {
+        elem.innerHTML = "Score: 0";
+    } else {
+        let score = Number(elem.innerHTML.substring(7)) + incr;
+        elem.innerHTML = "Score: " + score.toString();
+    }
+}
+
+
+function didCatTrapMouse() {
+//    console.log(Object.values(objectsInfo.catPos));
+    for (const pos of Object.values(objectsInfo.catPos)) {
+        if (mouseInfo.pos[0] == pos[0] && mouseInfo.pos[1] == pos[1]) {
+            game_over();
+        }
+    }
 }

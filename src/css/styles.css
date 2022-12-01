@@ -11,21 +11,28 @@
 .upper-panel {
 /*    height: 30px; */
     display: grid;
+    margin: 0 20%;
     grid-template-columns: 20% 50% 30%;
 }
 
 .new-game-button {
     color: black;
+    font-weight: bold;
 }
 
-.score {
-    color: green;
-    text-align: left;
+#score {
+    color: black;
+    text-align: right;
+    font-weight: bold;
 }
 
 .play-area {
-    position: relative;
     margin: 20px 0 0 0;
+    position: relative;
+    display: block;
+    margin-left: auto;
+    margin-right: auto;
+    width: 70%;
 }
 
 #play-grid {
@@ -39,3 +46,7 @@
     position: absolute;
 }
 
+#timer {
+    text-align: center;
+    font-weight: bold;
+}
