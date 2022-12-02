@@ -1,3 +1,32 @@
+/* Main functionality for mouse game */
+/*
+TODO: screens for start, game over, game finish, level finish, level start
+TODO: sign in with player name
+TODO: high scores (stored locally) indexed by player name
+TODO: more cats
+TODO:   fast cats (speed up when closer to mouse)
+TODO:   strong cats (can push blocks)
+TODO:   laser cats (can shoot lasers)
+TODO:   jumping cats (can leap over a single block)
+TODO:   smart cats (path-finding)
+TODO:   guard cats (stay in certain area)
+TODO:   cat den (spawns new cats, destroyed with a bomb)
+TODO: more terrain
+TODO:   heavy blocks (can't be moved)
+TODO:   rivers
+TODO:   more interesting background
+TODO:   teleport pads (only mouse)
+TODO: better mouse icon
+TODO: mouse abilities (timeout between each use)
+TODO:   force push (move block stack max distance)
+TODO:   shield (can pick up in some levels from cat fortresses)
+TODO:   bomb (can pick up, used to destroy heavy blocks and cat dens)
+TODO: 20 levels
+TODO: better styling (large play area, centered elements, nice-looking buttons and stats)
+TODO: game instructions at bottom
+*/
+
+
 // elements
 const MOUSE_ICON = document.getElementById('mouse-icon');
 const BLOCKS_DIV = document.getElementById('blocks-div');
@@ -379,10 +408,10 @@ function game_over() {
     go_to_level();
 }
 
-function go_to_level(lvl=-1) {
+function go_to_level(lvl=null) {
     let board;
 
-    if (lvl == -1) {
+    if (lvl == null) {
         LVL = 0;
     }
     else {
@@ -398,7 +427,7 @@ function go_to_level(lvl=-1) {
     objectsInfo = new Objects(board);
 
     // update game info
-    if (lvl == -1) {
+    if (lvl == null) {
         update_score();
     }
     else {
@@ -415,14 +444,13 @@ function go_to_level(lvl=-1) {
 }
 
 function update_timer() {
-    let elem = document.getElementById("timer");
+    let elemTimer = document.getElementById("timer");
 
     // decrement timer
     timeRemain -= 1;
 
     // reset if timer ran out
     if (timeRemain < 0) {
-        elem.style.color = "black";
         game_over();
         return;
     }
@@ -435,17 +463,12 @@ function update_timer() {
         text += "0"
     }
     text += sec.toString();
-    elem.innerHTML = text;
+    elemTimer.innerHTML = text;
 
     // update color
-    if (timeRemain <= 30) {
-        if (timeRemain <= 10) {
-            elem.style.color = "red";
-        }
-        else {
-            elem.style.color = "#cc9900";
-        }
-    }
+    if      (timeRemain > 30) { elemTimer.style.color = "black"; }
+    else if (timeRemain > 10) { elemTimer.style.color = "#cc9900"; }
+    else                      { elemTimer.style.color = "red"; }
 }
 
 function update_score(incr=null) {
@@ -544,24 +567,6 @@ function distEuclidean(x, y) {
         dist += (x[n] - y[n]) ** 2;
     }
     return Math.sqrt(dist);
-}
-
-function argmax(arr) {
-    if (arr.length === 0) {
-        return -1;
-    }
-
-    let max = arr[0];
-    let maxIndex = 0;
-
-    for (let i = 1; i < arr.length; i++) {
-        if (arr[i] > max) {
-            maxIndex = i;
-            max = arr[i];
-        }
-    }
-
-    return maxIndex;
 }
 
 function innerProdNormalized(x, y) {

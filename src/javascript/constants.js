@@ -30,4 +30,4 @@ const ASSET_PATH_BLOCK = "assets/block.png";
 const ASSET_PATH_CHEESE = "assets/cheese.png";
 const ASSET_PATH_CAT = "assets/cat.png";
 
-DETECT_RADIUS = 5;
+DETECT_RADIUS = 10;
