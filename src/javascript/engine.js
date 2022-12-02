@@ -1,26 +1,20 @@
-// global constants
-let timer;
-let trapped;
-
-// game state
-let time_left;
-let LVL = 0;
-
-
 // elements
 const MOUSE_ICON = document.getElementById('mouse-icon');
 const BLOCKS_DIV = document.getElementById('blocks-div');
 
-
-
 // state objects
+let LVL = 0;
 let mouseInfo;
 let objectsInfo;
+let timeRemain;
+let timer;
+let trapped = setInterval(didCatTrapMouse, 10);
+let catMove = [];
 
 
 // classes
 class Mouse {
-    constructor(vpos=0, hpos=0, blockBinMask=null) {
+    constructor(blockBinMask=null, vpos=0, hpos=0) {
         this.pos = [vpos, hpos];
         if (blockBinMask != null) {
             for (let i = 0; i < GRIDSIZE[0]; i++) {
@@ -78,24 +72,25 @@ class Mouse {
 
         // if not boundary-constrained, check if move is possible
         if (!onEdge) {
-            if (objectsInfo.hasCheese(next_pos)) {
+            if (objectsInfo.hasEmpty(next_pos) || objectsInfo.hasCat(next_pos)) {
+                this.pos = next_pos;
+            }
+            else if (objectsInfo.hasCheese(next_pos)) {
                 update_score(VAL_CHEESE);
                 objectsInfo.remove(next_pos);
                 this.pos = next_pos;
             }
-            else if (!objectsInfo.hasBlock(next_pos) || objectsInfo.hasCat(next_pos)) { // space is free or has cat
-                this.pos = next_pos;
-            }
-            else if (objectsInfo.canPush(next_pos, dir_)) { // blocks in the way
+            else if (objectsInfo.canPush(next_pos, dir_)) { // blocks in the way, but pushable
                 objectsInfo.pushObjects(next_pos, dir_);
                 this.pos = next_pos;
             }
+            // otherwise, unpushable blacks are in the way
         }
 
         // update icon
         this.updateIcon();
         if (!objectsInfo.anyCheeseRemaining()) {
-            level_up(LVL + 1);
+            go_to_level(LVL + 1);
         }
     }
     updateIcon() {
@@ -133,6 +128,7 @@ class Objects {
                 else if (lvl_layout[i][j] == SYMBOL_CAT) {
                     this.objMask[i].push(n_cat);
                     this.catPos[n_cat] = [i, j];
+//                    catMove.push(setInterval(catMoveFunc, 1000, n_cat));
                     n_cat += 1;
                 }
                 else {
@@ -148,15 +144,7 @@ class Objects {
             for (let j = 0; j < GRIDSIZE[1]; j++) {
                 n = this.objMask[i][j];
                 if (n != 0) {
-                    if (n >= ID_RANGE_BLOCK[0] && n <= ID_RANGE_BLOCK[1]) {
-                        text += this.addObjectText(i, j, "block");
-                    }
-                    else if (n >= ID_RANGE_CHEESE[0] && n <= ID_RANGE_CHEESE[1]) {
-                        text += this.addObjectText(i, j, "cheese");
-                    }
-                    else if (n >= ID_RANGE_CAT[0] && n <= ID_RANGE_CAT[1]) {
-                        text += this.addObjectText(i, j, "cat");
-                    }
+                    text += this.addObjectText(i, j, getObjectTypeFromId(n));
                 }
             }
         }
@@ -190,8 +178,17 @@ class Objects {
     }
 
     // status check methods
+    hasEmpty(pos) {
+        return this.objMask[pos[0]][pos[1]] == 0;
+    }
     hasBlock(pos) {
-        return this.objMask[pos[0]][pos[1]]
+        return isBlock(this.objMask[pos[0]][pos[1]]);
+    }
+    hasCheese(pos) {
+        return isCheese(this.objMask[pos[0]][pos[1]]);
+    }
+    hasCat(pos) {
+        return isCat(this.objMask[pos[0]][pos[1]]);
     }
     canPush(next_pos, dir_) {
         let canPush = false;
@@ -223,33 +220,13 @@ class Objects {
 
         return canPush;
     }
-    hasCheese(next_pos) {
-        let i = next_pos[0];
-        let j = next_pos[1];
-        let obj_id = this.objMask[i][j];
-        if (obj_id >= ID_RANGE_CHEESE[0] && obj_id <= ID_RANGE_CHEESE[1]) {
-            return true;
-        }
-        return false;
-    }
     anyCheeseRemaining() {
-        let n;
         for (let i = 0; i < GRIDSIZE[0]; i++) {
             for (let j = 0; j < GRIDSIZE[1]; j++) {
-                n = this.objMask[i][j];
-                if (n >= ID_RANGE_CHEESE[0] && n <= ID_RANGE_CHEESE[1]) {
+                if (isCheese(this.objMask[i][j])) {
                     return true;
                 }
             }
-        }
-        return false;
-    }
-    hasCat(next_pos) {
-        let i = next_pos[0];
-        let j = next_pos[1];
-        let obj_id = this.objMask[i][j];
-        if (obj_id >= ID_RANGE_CAT[0] && obj_id <= ID_RANGE_CAT[1]) {
-            return true;
         }
         return false;
     }
@@ -321,14 +298,12 @@ class Objects {
         this.objMask[i_start][j_start] = 0;
 
         // if cat, update its pos array
-        if (n >= ID_RANGE_CAT[0] && n <= ID_RANGE_CAT[1]) {
+        if (isCat(n)) {
             this.catPos[n] = [i_end, j_end];
         }
     }
-    remove(next_pos) {
-        let i = next_pos[0];
-        let j = next_pos[1];
-        this.objMask[i][j] = 0;
+    remove(pos) {
+        this.objMask[pos[0]][pos[1]] = 0;
         this.draw();
     }
 }
@@ -357,56 +332,59 @@ document.onkeypress = function(e) {
 
 // functions
 function game_over() {
-    level_up();
+    go_to_level();
 }
 
-function level_up(lvl=-1) {
+function go_to_level(lvl=-1) {
     let board;
 
-    if   (lvl == -1) { LVL = 0; }
-    else             { LVL = lvl % (MAX_LVL + 1); }
+    if (lvl == -1) {
+        LVL = 0;
+    }
+    else {
+        LVL = lvl % (MAX_LVL + 1);
+    }
 
     // reset play objects
     delete mouseInfo;
     delete objectsInfo;
     board = BLOCK_BIN_MASK[LVL];
-    mouseInfo = new Mouse(null, null, board);
+    mouseInfo = new Mouse(board);
     objectsInfo = new Objects(board);
 
     // update game info
-    if   (lvl == -1) { update_score(); }
-    else             { update_score(Math.floor(time_left * timeToScoreFactor)); }
+    if (lvl == -1) {
+        update_score();
+    }
+    else {
+        update_score(Math.floor(timeRemain * timeToScoreFactor));
+    }
 
     // reset timer
-    time_left = INIT_TIME + 1;
+    timeRemain = INIT_TIME + 1;
     if (timer != undefined) {
         clearInterval(timer);
     }
     update_timer();
     timer = setInterval(update_timer, 1000);
-
-    // set trap callback
-    if (trapped == undefined) {
-        trapped = setInterval(didCatTrapMouse, 100);
-    }
 }
 
 function update_timer() {
     let elem = document.getElementById("timer");
 
     // decrement timer
-    time_left -= 1;
+    timeRemain -= 1;
 
     // reset if timer ran out
-    if (time_left < 0) {
+    if (timeRemain < 0) {
         elem.style.color = "black";
         game_over();
         return;
     }
 
     // update text
-    let min = Math.floor(time_left / 60);
-    let sec = (time_left - min * 60);
+    let min = Math.floor(timeRemain / 60);
+    let sec = (timeRemain - min * 60);
     let text = min.toString() + ":";
     if (sec < 10) {
         text += "0"
@@ -415,8 +393,8 @@ function update_timer() {
     elem.innerHTML = text;
 
     // update color
-    if (time_left < 30) {
-        if (time_left <= 10) {
+    if (timeRemain < 30) {
+        if (timeRemain <= 10) {
             elem.style.color = "red";
         } else {
             elem.style.color = "#cc9900";
@@ -428,7 +406,8 @@ function update_score(incr=null) {
     let elem = document.getElementById("score");
     if (incr == null) {
         elem.innerHTML = "Score: 0";
-    } else {
+    }
+    else {
         let score = Number(elem.innerHTML.substring(7)) + incr;
         elem.innerHTML = "Score: " + score.toString();
     }
@@ -436,10 +415,44 @@ function update_score(incr=null) {
 
 
 function didCatTrapMouse() {
-//    console.log(Object.values(objectsInfo.catPos));
+    if (objectsInfo == undefined || mouseInfo == undefined) {
+        return;
+    }
     for (const pos of Object.values(objectsInfo.catPos)) {
-        if (mouseInfo.pos[0] == pos[0] && mouseInfo.pos[1] == pos[1]) {
+        if (hasMouse(pos)) {
             game_over();
         }
     }
 }
+
+function hasMouse(pos) {
+    return mouseInfo.pos[0] == pos[0] && mouseInfo.pos[1] == pos[1];
+}
+
+function isBlock(n) {
+    return n >= ID_RANGE_BLOCK[0] && n <= ID_RANGE_BLOCK[1];
+}
+
+function isCheese(n) {
+    return n >= ID_RANGE_CHEESE[0] && n <= ID_RANGE_CHEESE[1];
+}
+
+function isCat(n) {
+    return n >= ID_RANGE_CAT[0] && n <= ID_RANGE_CAT[1];
+}
+
+function getObjectTypeFromId(n) {
+    if (isBlock(n))  { return "block";  }
+    if (isCheese(n)) { return "cheese"; }
+    if (isCat(n))    { return "cat";    }
+    return "";
+}
+
+//function catMoveFunc(n) {
+//    let pos = objectsInfo.catPos[n];
+//    let freePos = objectsInfo.free
+//    if () {
+//        objectsInfo.move(pos[0], pos[1], pos_new[0], pos_new[1]);
+//        objectsInfo.catPos[n] = pos_new;
+//    }
+//}
