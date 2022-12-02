@@ -9,7 +9,7 @@ let objectsInfo;
 let timeRemain;
 let timer;
 let trapped = setInterval(didCatTrapMouse, 10);
-let catMove = [];
+let catMove = {};
 
 
 // classes
@@ -103,33 +103,39 @@ class Mouse {
 
 class Objects {
     constructor(lvl_layout) {
-        // init block mask
+        // init object id's
+        this.n_block = ID_RANGE_BLOCK[0]; // 1 through 400
+        this.n_cheese = ID_RANGE_CHEESE[0]; // 401 through 450
+        this.n_cat = ID_RANGE_CAT[0]; // 451 through 500
+
+        // init cat positions
         this.catPos = {};
+
+        // init block mask
         this.objMask = [];
         this.initObjMask(lvl_layout);
+
+        // draw all objects
         this.draw();
     }
     initObjMask(lvl_layout) {
         let n_empty = 0; // empty cells
-        let n_block = ID_RANGE_BLOCK[0]; // 1 through 400
-        let n_cheese = ID_RANGE_CHEESE[0]; // 401 through 450
-        let n_cat = ID_RANGE_CAT[0]; // 451 through 500
         for (let i = 0; i < GRIDSIZE[0]; i++) {
             this.objMask.push([]);
             for (let j = 0; j < GRIDSIZE[1]; j++) {
                 if (lvl_layout[i][j] == SYMBOL_BLOCK) {
-                    this.objMask[i].push(n_block);
-                    n_block += 1;
+                    this.objMask[i].push(this.n_block);
+                    this.n_block += 1;
                 }
                 else if (lvl_layout[i][j] == SYMBOL_CHEESE) {
-                    this.objMask[i].push(n_cheese);
-                    n_cheese += 1;
+                    this.objMask[i].push(this.n_cheese);
+                    this.n_cheese += 1;
                 }
                 else if (lvl_layout[i][j] == SYMBOL_CAT) {
-                    this.objMask[i].push(n_cat);
-                    this.catPos[n_cat] = [i, j];
-//                    catMove.push(setInterval(catMoveFunc, 1000, n_cat));
-                    n_cat += 1;
+                    this.objMask[i].push(this.n_cat);
+                    this.catPos[this.n_cat] = [i, j];
+                    catMove[this.n_cat] = setInterval(catMoveFunc, 1000, this.n_cat);
+                    this.n_cat += 1;
                 }
                 else {
                     this.objMask[i].push(n_empty);
@@ -158,23 +164,26 @@ class Objects {
 
         let text = '';
         text += '<img id="object' + n.toString() + '" src=';
-        if      (type == "block")  { text += '"assets/block.png"';  }
-        else if (type == "cheese") { text += '"assets/cheese.png"'; }
-        else if (type == "cat")    { text += '"assets/cat.png"';    }
+        if      (type == "block")  { text += '"' + ASSET_PATH_BLOCK + '"';  }
+        else if (type == "cheese") { text += '"' + ASSET_PATH_CHEESE + '"'; }
+        else if (type == "cat")    { text += '"' + ASSET_PATH_CAT + '"';    }
         text += ' style="';
         text += ' top:' + top.toString() + 'px;';
         text += ' left:' + left.toString() + 'px;';
         text += ' position:absolute;';
         text += ' border-radius:20%;';
-        if      (type == "block")  { text += ' height:26px;'; }
-        else if (type == "cheese") { text += ' height:18px;'; }
-        else if (type == "cat")    { text += ' height:24px;'; }
+        text += ' height:' + this.getObjectTextHeight(type) + ';';
         text += ' z-order:5;'
         text += '"';
         text += '>';
         text += '\n';
 
         return text;
+    }
+    getObjectTextHeight(type) {
+        if      (type == "block")  { return '26px'; }
+        else if (type == "cheese") { return '18px'; }
+        else if (type == "cat")    { return '24px'; }
     }
 
     // status check methods
@@ -214,7 +223,7 @@ class Objects {
             }
         }
         while (!canPush && i >= 0 && i <= GRIDSIZE[0] - 1 && j >= 0 && j <= GRIDSIZE[1] - 1) {
-            canPush ||= !Boolean(this.objMask[i][j]);
+            canPush ||= (this.hasEmpty([i, j]) || this.hasCheese([i, j]));
             increment();
         }
 
@@ -223,12 +232,23 @@ class Objects {
     anyCheeseRemaining() {
         for (let i = 0; i < GRIDSIZE[0]; i++) {
             for (let j = 0; j < GRIDSIZE[1]; j++) {
-                if (isCheese(this.objMask[i][j])) {
+                if (isEdible(this.objMask[i][j])) {
                     return true;
                 }
             }
         }
         return false;
+    }
+    freeCellsAround(pos) {
+        let freePos = [];
+        for (let i = Math.max(0, pos[0] - 1); i <= Math.min(GRIDSIZE[0] - 1, pos[0] + 1); i++) {
+            for (let j = Math.max(0, pos[1] - 1); j <= Math.min(GRIDSIZE[1] - 1, pos[1] + 1); j++) {
+                if (!this.objMask[i][j]) {
+                    freePos.push([i, j]);
+                }
+            }
+        }
+        return freePos;
     }
 
     // action methods
@@ -271,11 +291,17 @@ class Objects {
 
         // search for the furthest-away block in the stack
         do {
-            if (!this.objMask[i][j]) {
+            if (this.hasEmpty([i, j]) || this.hasCheese([i, j])) {
                 break;
             }
             increment(0);
         } while (i >= 0 && i <= GRIDSIZE[0] - 1 && j >= 0 && j <= GRIDSIZE[1] - 1);
+
+        // handle cheese getting crushed
+        if (this.hasCheese([i, j])) {
+            this.objMask[i][j] = 0;
+            this.draw();
+        }
 
         // move blocks away in reverse distance-from-mouse order
         while (cond()) {
@@ -305,6 +331,24 @@ class Objects {
     remove(pos) {
         this.objMask[pos[0]][pos[1]] = 0;
         this.draw();
+    }
+    turnCatIntoCheese(n) {
+        // get info
+        let elem = document.getElementById("object" + n.toString());
+        let pos = this.catPos[n];
+        let n_new = this.n_cheese;
+        this.n_cheese += 1;
+
+        // update image
+        elem.src = ASSET_PATH_CHEESE;
+        elem.style.height = this.getObjectTextHeight("cheese");
+
+        // update other info
+        elem.id = "object" + n_new.toString();
+        this.objMask[pos[0]][pos[1]] = n_new;
+
+        // remove cat pos
+        delete this.catPos[n];
     }
 }
 
@@ -346,6 +390,7 @@ function go_to_level(lvl=-1) {
     }
 
     // reset play objects
+    Object.keys(catMove).forEach(n => clearOneCatMove(n));
     delete mouseInfo;
     delete objectsInfo;
     board = BLOCK_BIN_MASK[LVL];
@@ -393,10 +438,11 @@ function update_timer() {
     elem.innerHTML = text;
 
     // update color
-    if (timeRemain < 30) {
+    if (timeRemain <= 30) {
         if (timeRemain <= 10) {
             elem.style.color = "red";
-        } else {
+        }
+        else {
             elem.style.color = "#cc9900";
         }
     }
@@ -404,13 +450,9 @@ function update_timer() {
 
 function update_score(incr=null) {
     let elem = document.getElementById("score");
-    if (incr == null) {
-        elem.innerHTML = "Score: 0";
-    }
-    else {
-        let score = Number(elem.innerHTML.substring(7)) + incr;
-        elem.innerHTML = "Score: " + score.toString();
-    }
+    if (incr == null) { elem.innerHTML = "Score: 0"; }
+    else              { elem.innerHTML = "Score: " +
+                        (Number(elem.innerHTML.substring(7)) + incr).toString(); }
 }
 
 
@@ -441,6 +483,10 @@ function isCat(n) {
     return n >= ID_RANGE_CAT[0] && n <= ID_RANGE_CAT[1];
 }
 
+function isEdible(n) {
+    return isCheese(n) || isCat(n);
+}
+
 function getObjectTypeFromId(n) {
     if (isBlock(n))  { return "block";  }
     if (isCheese(n)) { return "cheese"; }
@@ -448,11 +494,80 @@ function getObjectTypeFromId(n) {
     return "";
 }
 
-//function catMoveFunc(n) {
-//    let pos = objectsInfo.catPos[n];
-//    let freePos = objectsInfo.free
-//    if () {
-//        objectsInfo.move(pos[0], pos[1], pos_new[0], pos_new[1]);
-//        objectsInfo.catPos[n] = pos_new;
-//    }
-//}
+function catMoveFunc(n) {
+    let catPos = objectsInfo.catPos[n];
+    let freePos = objectsInfo.freeCellsAround(catPos);
+    if (freePos.length) { // cat can move
+        let posNew, i;
+        let mousePos = mouseInfo.pos;
+        let dist = distEuclidean(catPos, mousePos);
+        if (dist > DETECT_RADIUS) {
+            // cat is not near mouse, random movement
+            i = Math.floor(Math.random() * freePos.length);
+        }
+        else {
+            // cat can see mouse, chase movement
+            let dirVec = [mousePos[0] - catPos[0], mousePos[1] - catPos[1]];
+            let innerProd = [];
+            let val;
+            let maxVal = -2;
+            for (const [n, vec] of freePos.entries()) {
+                val = innerProdNormalized([vec[0] - catPos[0], vec[1] - catPos[1]], dirVec);
+                if (val > maxVal) {
+                    maxVal = val;
+                    i = n;
+                }
+            }
+        }
+        posNew = freePos[i];
+        objectsInfo.move(catPos[0], catPos[1], posNew[0], posNew[1]);
+        objectsInfo.catPos[n] = posNew;
+    }
+    else {
+        // cat is trapped; turns into cheese
+        objectsInfo.turnCatIntoCheese(n);
+        clearOneCatMove(n);
+    }
+}
+
+function clearOneCatMove(n) {
+    clearInterval(catMove[n]);
+    delete catMove[n];
+}
+
+function distEuclidean(x, y) {
+    if (x.length != y.length) {
+        return Math.NaN;
+    }
+    let dist = 0;
+    for (let n = 0; n < x.length; n++) {
+        dist += (x[n] - y[n]) ** 2;
+    }
+    return Math.sqrt(dist);
+}
+
+function argmax(arr) {
+    if (arr.length === 0) {
+        return -1;
+    }
+
+    let max = arr[0];
+    let maxIndex = 0;
+
+    for (let i = 1; i < arr.length; i++) {
+        if (arr[i] > max) {
+            maxIndex = i;
+            max = arr[i];
+        }
+    }
+
+    return maxIndex;
+}
+
+function innerProdNormalized(x, y) {
+    return (x[0] * y[0] + x[1] * y[1]) / (L2Norm(x) * L2Norm(y))
+}
+
+function L2Norm(x) {
+    return Math.sqrt(x.reduce((sum, x) => sum + x ** 2, 0))
+}

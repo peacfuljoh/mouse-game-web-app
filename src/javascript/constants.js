@@ -25,3 +25,9 @@ const INIT_TIME = 120;
 const VAL_CHEESE = 20;
 
 const timeToScoreFactor = 0.2;
+
+const ASSET_PATH_BLOCK = "assets/block.png";
+const ASSET_PATH_CHEESE = "assets/cheese.png";
+const ASSET_PATH_CAT = "assets/cat.png";
+
+DETECT_RADIUS = 5;
