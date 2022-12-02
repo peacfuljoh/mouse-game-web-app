@@ -1,47 +1,53 @@
 /* Main functionality for mouse game */
 /*
-TODO: screens for start, game over, game finish, level finish, level start
-TODO: sign in with player name
-TODO: high scores (stored locally) indexed by player name
 TODO: more cats
-TODO:   fast cats (speed up when closer to mouse)
+TODO:   smart cats (path-finding)
+TODO:   jumping cats (can leap over a single block)
 TODO:   strong cats (can push blocks)
 TODO:   laser cats (can shoot lasers)
-TODO:   jumping cats (can leap over a single block)
-TODO:   smart cats (path-finding)
-TODO:   guard cats (stay in certain area)
 TODO:   cat den (spawns new cats, destroyed with a bomb)
+TODO:   stealth cat (invisible when not moving)
+TODO:   guard cats (stay in certain area)
 TODO: more terrain
 TODO:   heavy blocks (can't be moved)
 TODO:   rivers
 TODO:   more interesting background
 TODO:   teleport pads (only mouse)
-TODO: better mouse icon
+
+TODO: 20 levels
+TODO: better styling (centered elements, nice-looking buttons and stats)
+
 TODO: mouse abilities (timeout between each use)
 TODO:   force push (move block stack max distance)
 TODO:   shield (can pick up in some levels from cat fortresses)
 TODO:   bomb (can pick up, used to destroy heavy blocks and cat dens)
-TODO: 20 levels
-TODO: better styling (large play area, centered elements, nice-looking buttons and stats)
-TODO: game instructions at bottom
+
 */
 
 
 // elements
 const MOUSE_ICON = document.getElementById('mouse-icon');
-const BLOCKS_DIV = document.getElementById('blocks-div');
+const OBJECTS_DIV = document.getElementById('objects-div');
+const PLAY_GRID = document.getElementById('play-grid');
+const OVERLAY_DIV = document.getElementById('overlay');
+const LEVEL_P = document.getElementById('level');
 
 // state objects
 let LVL = 0;
 let mouseInfo;
 let objectsInfo;
-let timeRemain;
+let timeRemain = 0;
 let timer;
 let trapped = setInterval(didCatTrapMouse, 10);
 let catMove = {};
+let GAME_OVER = true;
+
+let HIGH_SCORE = 0;
 
 
-// classes
+
+
+/* CLASSES */
 class Mouse {
     constructor(blockBinMask=null, vpos=0, hpos=0) {
         this.pos = [vpos, hpos];
@@ -56,8 +62,13 @@ class Mouse {
         }
         this.dir = 0;
         this.updateIcon();
+        this.isAlive = true;
     }
     move(dir_) {
+        if (!this.isAlive) {
+            return;
+        }
+
         let next_pos;
         let onEdge = false; // trying to move across grid boundary
 
@@ -118,11 +129,12 @@ class Mouse {
 
         // update icon
         this.updateIcon();
-        if (!objectsInfo.anyCheeseRemaining()) {
+        if (!GAME_OVER && !objectsInfo.anyCheeseRemaining()) {
             go_to_level(LVL + 1);
         }
     }
     updateIcon() {
+        MOUSE_ICON.src = ASSET_PATH_MOUSE;
         MOUSE_ICON.style.transform = 'rotate(' + (90 * this.dir).toString() + 'deg)'
         MOUSE_ICON.style.top = (MOUSE_PX_TOP0 + this.pos[0] * MOUSE_PX_PER_CELL).toString() + 'px';
         MOUSE_ICON.style.left = (MOUSE_PX_LEFT0 + this.pos[1] * MOUSE_PX_PER_CELL).toString() + 'px';
@@ -163,7 +175,8 @@ class Objects {
                 else if (lvl_layout[i][j] == SYMBOL_CAT) {
                     this.objMask[i].push(this.n_cat);
                     this.catPos[this.n_cat] = [i, j];
-                    catMove[this.n_cat] = setInterval(catMoveFunc, 1000, this.n_cat);
+                    setCatMoveBasic(this.n_cat)
+//                    catMove[this.n_cat] = setInterval(catMoveFuncBasic, 1000, this.n_cat);
                     this.n_cat += 1;
                 }
                 else {
@@ -183,7 +196,7 @@ class Objects {
                 }
             }
         }
-        BLOCKS_DIV.innerHTML = text;
+        OBJECTS_DIV.innerHTML = text;
     }
     addObjectText(i, j, type) {
         let top = BLOCK_PX_TOP0 + i * BLOCK_PX_PER_CELL;
@@ -382,7 +395,8 @@ class Objects {
 }
 
 
-// callbacks
+
+/* USER INPUT */
 document.onkeypress = function(e) {
     switch (e.key) {
         case "w":
@@ -403,26 +417,107 @@ document.onkeypress = function(e) {
 
 
 
-// functions
-function game_over() {
+/* GAME OVER, NEW GAME, LEVEL CHANGE */
+function new_game() {
+    GAME_OVER = false;
+    reset_overlay();
+    timeRemain = 0;
     go_to_level();
 }
 
-function go_to_level(lvl=null) {
-    let board;
+function reset_overlay() {
+    OVERLAY_DIV.innerHTML = "";
+    OVERLAY_DIV.style.padding = "";
+}
 
-    if (lvl == null) {
-        LVL = 0;
+function game_over(win=false) {
+    GAME_OVER = true;
+
+    // update mouse info
+    if (!win) {
+        mouseInfo.isAlive = false;
+        mouseInfo.pos = [-100, -100];
+        MOUSE_ICON.src = "";
+    }
+
+    // save high score
+    HIGH_SCORE = Math.max(HIGH_SCORE, get_score());
+
+    // show overlay
+    show_game_over_overlay(win)
+
+    // stop timer
+    clearInterval(timer);
+    delete timer;
+}
+
+function show_game_over_overlay(win) {
+    OVERLAY_DIV.innerHTML = game_over_text(win);
+    OVERLAY_DIV.style.padding = "30px 50px";
+    if (win) {
+        OVERLAY_DIV.style.top = "160px";
+        OVERLAY_DIV.style.left = "125px";
     }
     else {
-        LVL = lvl % (MAX_LVL + 1);
+        OVERLAY_DIV.style.top = "160px";
+        OVERLAY_DIV.style.left = "170px";
+    }
+    OVERLAY_DIV.style.backgroundColor = "rgba(217, 245, 255, 0.9)";
+}
+
+function game_over_text(win) {
+    centerStyle = 'text-align:center; ';
+
+    let score_ = get_score();
+    let scoreColorStyle = '';
+    if (score_ == HIGH_SCORE) { scoreColorStyle = "color:green; " }
+
+    let endGameMsg, gameOverMsg;
+    if (win) {
+        gameOverMsg = 'CONGRATULATIONS'
+        endGameMsg = 'You ate all the cheese!';
+    }
+    else {
+        gameOverMsg = 'GAME OVER';
+        if (timeRemain >= 0) { endGameMsg = 'You have been eaten.'; }
+        else                 { endGameMsg = 'You ran out of time!'; }
     }
 
-    // reset play objects
-    Object.keys(catMove).forEach(n => clearOneCatMove(n));
+    text = '';
+    text += '<h2 style="' + centerStyle + 'font-weight:bold">' + gameOverMsg + '</h2>';
+    text += '<h3 style="' + centerStyle + '">' + endGameMsg + '</h3>';
+    text += '<h4 style="' + centerStyle + scoreColorStyle + '">Final Score: ' + score_ + '</h4>';
+    text += '<h4 style="' + centerStyle + scoreColorStyle + '">High score: ' + HIGH_SCORE + '</h4>';
+    return text;
+}
+
+function go_to_level(lvl=null) {
+    // freeze cats
+    clearCatMove();
+
+    // determine level
+    if (lvl == null) { // new game
+        LVL = 0;
+    }
+    else if (lvl <= MAX_LVL) { // next level
+        LVL = lvl;
+    }
+    else { // game finish
+        add_time_to_score()
+        game_over(true);
+        console.log('here');
+        return;
+    }
+
+    // continue reset
     delete mouseInfo;
     delete objectsInfo;
-    board = BLOCK_BIN_MASK[LVL];
+    PLAY_GRID.src = "";
+    show_next_level_overlay();
+
+    // reset play objects
+    PLAY_GRID.src = ASSET_PATH_GRID;
+    let board = BLOCK_BIN_MASK[LVL];
     mouseInfo = new Mouse(board);
     objectsInfo = new Objects(board);
 
@@ -431,11 +526,12 @@ function go_to_level(lvl=null) {
         update_score();
     }
     else {
-        update_score(Math.floor(timeRemain * timeToScoreFactor));
+        add_time_to_score();
     }
+    LEVEL_P.innerHTML = "Level " + (LVL + 1);
 
     // reset timer
-    timeRemain = INIT_TIME + 1;
+    timeRemain = TIME_REMAIN_ALL[LVL] + 1;
     if (timer != undefined) {
         clearInterval(timer);
     }
@@ -443,6 +539,26 @@ function go_to_level(lvl=null) {
     timer = setInterval(update_timer, 1000);
 }
 
+function show_next_level_overlay() {
+    text = '';
+    text += '<h1>Level ' + (LVL + 1) + '</h1>';
+    text += '<p></p>';
+
+    OVERLAY_DIV.innerHTML = text;
+    OVERLAY_DIV.style.padding = "30px 50px";
+    OVERLAY_DIV.style.top = "100px";
+    OVERLAY_DIV.style.left = "210px";
+    OVERLAY_DIV.style.backgroundColor = "rgba(217, 245, 255, 0.9)";
+
+    setTimeout(function() {
+        OVERLAY_DIV.innerHTML = '';
+        OVERLAY_DIV.style.padding = '';
+    }, 2000);
+}
+
+
+
+/* TIMER, SCORE */
 function update_timer() {
     let elemTimer = document.getElementById("timer");
 
@@ -471,14 +587,24 @@ function update_timer() {
     else                      { elemTimer.style.color = "red"; }
 }
 
+function add_time_to_score() {
+    update_score(Math.floor(timeRemain * timeToScoreFactor));
+}
+
 function update_score(incr=null) {
     let elem = document.getElementById("score");
     if (incr == null) { elem.innerHTML = "Score: 0"; }
-    else              { elem.innerHTML = "Score: " +
-                        (Number(elem.innerHTML.substring(7)) + incr).toString(); }
+    else              { elem.innerHTML = "Score: " + (get_score() + incr); }
+}
+
+function get_score() {
+    let elem = document.getElementById("score");
+    return Number(elem.innerHTML.substring(7));
 }
 
 
+
+/* PLAY AREA STATUS */
 function didCatTrapMouse() {
     if (objectsInfo == undefined || mouseInfo == undefined) {
         return;
@@ -517,47 +643,84 @@ function getObjectTypeFromId(n) {
     return "";
 }
 
-function catMoveFunc(n) {
+
+
+/*  CAT MOVEMENT */
+function catMoveFuncBasic(n) {
     let catPos = objectsInfo.catPos[n];
     let freePos = objectsInfo.freeCellsAround(catPos);
-    if (freePos.length) { // cat can move
-        let posNew, i;
+    if (freePos.length) { // cat can move (random or chase)
         let mousePos = mouseInfo.pos;
-        let dist = distEuclidean(catPos, mousePos);
-        if (dist > DETECT_RADIUS) {
-            // cat is not near mouse, random movement
-            i = Math.floor(Math.random() * freePos.length);
+        let i;
+        if (distEuclidean(catPos, mousePos) > DETECT_RADIUS) {
+            i = getNextCatPosRandom(freePos.length);
+            if (LVL >= LVL_FAST_BASIC_CATS) { setCatMoveBasic(n, "slow"); }
         }
         else {
-            // cat can see mouse, chase movement
-            let dirVec = [mousePos[0] - catPos[0], mousePos[1] - catPos[1]];
-            let innerProd = [];
-            let val;
-            let maxVal = -2;
-            for (const [n, vec] of freePos.entries()) {
-                val = innerProdNormalized([vec[0] - catPos[0], vec[1] - catPos[1]], dirVec);
-                if (val > maxVal) {
-                    maxVal = val;
-                    i = n;
-                }
-            }
+            i = getNextCatPosChaseBasic(mousePos, catPos, freePos);
+            if (LVL >= LVL_FAST_BASIC_CATS) { setCatMoveBasic(n, "fast") };
         }
-        posNew = freePos[i];
-        objectsInfo.move(catPos[0], catPos[1], posNew[0], posNew[1]);
-        objectsInfo.catPos[n] = posNew;
+        objectsInfo.move(catPos[0], catPos[1], freePos[i][0], freePos[i][1]);
+        objectsInfo.catPos[n] = freePos[i];
+    }
+    else { // cat is trapped, turns into cheese
+        objectsInfo.turnCatIntoCheese(n);
+        clearCatMove(n);
+    }
+}
+
+function getNextCatPosRandom(numChoices) {
+    return Math.floor(Math.random() * numChoices);
+}
+
+function getNextCatPosChaseBasic(mousePos, catPos, freePos) {
+    let dirVec = [mousePos[0] - catPos[0], mousePos[1] - catPos[1]];
+    let innerProd = [];
+    let val;
+    let maxVal = -2;
+    for (const [n, vec] of freePos.entries()) {
+        val = innerProdNormalized([vec[0] - catPos[0], vec[1] - catPos[1]], dirVec);
+        if (val > maxVal) {
+            maxVal = val;
+            i = n;
+        }
+    }
+    return i;
+}
+
+function setCatMoveBasic(n, speed="slow") {
+    if (n in catMove) {
+        clearInterval(catMove[n]);
+    }
+    switch(speed) {
+        case "slow": dur = getCatMoveBasicDurSlow(); break;
+        case "fast": dur = getCatMoveBasicDurFast(); break;
+        default:     dur = getCatMoveBasicDurSlow(); break;
+    }
+    catMove[n] = setInterval(catMoveFuncBasic, dur, n);
+}
+
+function getCatMoveBasicDurSlow() {
+    return CAT_MOVE_BASIC_SLOW_MIN + CAT_MOVE_BASIC_SLOW_RANGE * Math.random();
+}
+
+function getCatMoveBasicDurFast() {
+    return CAT_MOVE_BASIC_FAST_MIN + CAT_MOVE_BASIC_FAST_RANGE * Math.random();
+}
+
+function clearCatMove(n=null) {
+    if (n == null) {
+        Object.keys(catMove).forEach(n => clearCatMove(n));
     }
     else {
-        // cat is trapped; turns into cheese
-        objectsInfo.turnCatIntoCheese(n);
-        clearOneCatMove(n);
+        clearInterval(catMove[n]);
+        delete catMove[n];
     }
 }
 
-function clearOneCatMove(n) {
-    clearInterval(catMove[n]);
-    delete catMove[n];
-}
 
+
+/* MATH, GEOMETRY */
 function distEuclidean(x, y) {
     if (x.length != y.length) {
         return Math.NaN;

@@ -49,6 +49,31 @@ BLOCK_BIN_MASK[1] = [
     "-BB-H-A-BB--B-BB-H--"
 ];
 
+// level 2
+BLOCK_BIN_MASK[2] = [
+    "--------------------",
+    "--BB---BB---B--B----",
+    "--B---B---BB---BBB--",
+    "----B-BB-A---BB-----",
+    "--B-B-BB-H--B--B-BB-",
+    "-BB-BB-B--B--B--A-BB",
+    "-B-A-BB-B--BB-B---B-",
+    "--B---BB--BB--B-B--B",
+    "B--BBB-B-B-B--BB----",
+    "--B---B-B-B-B--B----",
+    "B---BB-BB---BB--BBB-",
+    "--------------------",
+    "--------------------",
+    "--------------------",
+    "--------------------",
+    "--------------------",
+    "BBBBBBBBBBBBBBBBBBBB",
+    "------B-----B-------",
+    "--A---B--M--B---A---",
+    "------B-----B-------"
+]
+
+// validate boards
 for (let n = 0; n < BLOCK_BIN_MASK.length; n++) {
     let board = BLOCK_BIN_MASK[n];
     let num_rows = board.length;
@@ -63,3 +88,4 @@ for (let n = 0; n < BLOCK_BIN_MASK.length; n++) {
 }
 
 const MAX_LVL = BLOCK_BIN_MASK.length - 1;
+//const MAX_LVL = 0;

@@ -13,17 +13,32 @@
     </div>
 
     <div class="upper-panel">
-        <button class="new-game-button" onclick="game_over()">New game</button>
+        <button class="new-game-button" onclick="new_game()">New game</button>
+        <p id="level"></p>
         <p id="timer"></p>
-        <p id="score">Score: 0</p>
+        <p id="score"></p>
     </div>
 
     <div class="play-area">
-        <img id="play-grid" height="600px" src="assets/play_grid.png">
-        <img id="mouse-icon" height="20px" src="assets/mouse_icon.png">
-<!--        <img id="blocks2" src="assets/block.png" style="top:150px; left:210px;">-->
-        <div id="blocks-div">
-            <!-- block code inserted here and updated dynamically -->
+        <img id="play-grid" height="600px">
+        <img id="mouse-icon" height="24px">
+        <div id="objects-div">
+            <!-- objects info inserted here -->
+        </div>
+        <div id="overlay">
+            <h1>Welcome to <i>Mouse</i></h1>
+            <p>
+                In this game, you are a clever rodent on a quest for cheese. Cats are patrolling the area.
+                Luckily, you're strong and can push blocks around to trap the cats and turn them
+                into cheese. Yum!
+            </p>
+            <p>
+                But beware. As you progress through the levels, the cats will get smarter, faster, and
+                maybe even develop mutant abilities.
+            </p>
+            <p>
+                Good luck!
+            </p>
         </div>
     </div>
 </div>

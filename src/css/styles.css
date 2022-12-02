@@ -12,7 +12,7 @@
 /*    height: 30px; */
     display: grid;
     margin: 0 20%;
-    grid-template-columns: 20% 50% 30%;
+    grid-template-columns: 25% 25% 25% 25%;
 }
 
 .new-game-button {
@@ -23,6 +23,11 @@
 #score {
     color: black;
     text-align: right;
+    font-weight: bold;
+}
+
+#level {
+    text-align: center;
     font-weight: bold;
 }
 
@@ -49,4 +54,11 @@
 #timer {
     text-align: center;
     font-weight: bold;
+}
+
+#overlay {
+    z-order: 10;
+    top: 80px;
+    left: 80px;
+    position: absolute;
 }
