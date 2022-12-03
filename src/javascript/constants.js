@@ -9,7 +9,9 @@ const BLOCK_PX_LEFT0 = 2;
 const BLOCK_PX_TOP0 = 2;
 const BLOCK_PX_PER_CELL = 29.95;
 
-const INIT_LVL = 0;
+const INIT_LVL = 2;
+const MAX_LVL = 2;
+//const MAX_LVL = 0;
 
 const SYMBOL_BLOCK = "B";
 const SYMBOL_CHEESE = "H";
@@ -42,4 +44,3 @@ const CAT_MOVE_BASIC_FAST_MIN = 500;
 const CAT_MOVE_BASIC_FAST_RANGE = 200;
 
 const TIME_REMAIN_ALL = [300, 180, 240];
-

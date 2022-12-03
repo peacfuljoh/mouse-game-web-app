@@ -1,8 +1,24 @@
 // starting board configs
 const BLOCK_BIN_MASK = [];
 
+const CAT_TYPES = {};
+const CAT_PARAMS = {};
+for (let i = 0; i <= MAX_LVL; i++) {
+    CAT_TYPES[i] = {};
+    CAT_PARAMS[i] = {};
+}
+
+let L = 0;
+let catNums;
+
+let BASIC_SPEED = {"speed": "slow"};
+
+function addO(obj, n, info) {
+    obj[ID_RANGE_CAT[0] + n] = info;
+}
+
 // level 0
-BLOCK_BIN_MASK[0] = [
+BLOCK_BIN_MASK[L] = [
     "B------------------B",
     "--------------------",
     "---------BBBB-------",
@@ -25,8 +41,12 @@ BLOCK_BIN_MASK[0] = [
     "B---------B--------B"
 ];
 
+addO(CAT_TYPES[L], 0, "basic");
+addO(CAT_PARAMS[L], 0, BASIC_SPEED);
+
 // level 1
-BLOCK_BIN_MASK[1] = [
+L = 1;
+BLOCK_BIN_MASK[L] = [
     "----BB--------------",
     "-M--BBBBBB----------",
     "BBBBBB--------------",
@@ -49,8 +69,13 @@ BLOCK_BIN_MASK[1] = [
     "-BB-H-A-BB--B-BB-H--"
 ];
 
+catNums = [0, 1, 2];
+catNums.forEach(n => addO(CAT_TYPES[L], n, "basic"));
+catNums.forEach(n => addO(CAT_PARAMS[L], n, BASIC_SPEED));
+
 // level 2
-BLOCK_BIN_MASK[2] = [
+L = 2;
+BLOCK_BIN_MASK[L] = [
     "--------------------",
     "--BB---BB---B--B----",
     "--B---B---BB---BBB--",
@@ -73,6 +98,13 @@ BLOCK_BIN_MASK[2] = [
     "------B-----B-------"
 ]
 
+catNums = [0, 1, 2];
+catNums.forEach(n => addO(CAT_TYPES[L], n, "basicFast"));
+catNums.forEach(n => addO(CAT_PARAMS[L], n, BASIC_SPEED));
+catNums = [3, 4];
+catNums.forEach(n => addO(CAT_TYPES[L], n, "basic"));
+catNums.forEach(n => addO(CAT_PARAMS[L], n, BASIC_SPEED));
+
 // validate boards
 for (let n = 0; n < BLOCK_BIN_MASK.length; n++) {
     let board = BLOCK_BIN_MASK[n];
@@ -86,6 +118,3 @@ for (let n = 0; n < BLOCK_BIN_MASK.length; n++) {
         }
     }
 }
-
-const MAX_LVL = BLOCK_BIN_MASK.length - 1;
-//const MAX_LVL = 0;
