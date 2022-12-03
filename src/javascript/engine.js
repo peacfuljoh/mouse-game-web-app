@@ -22,6 +22,8 @@ TODO:   force push (move block stack max distance)
 TODO:   shield (can pick up in some levels from cat fortresses)
 TODO:   bomb (can pick up, used to destroy heavy blocks and cat dens)
 
+TODO: fix bug (game over screen goes away if mouse runs through cat)
+
 */
 
 
@@ -149,8 +151,8 @@ class Objects {
         this.n_cheese = ID_RANGE_CHEESE[0]; // 401 through 450
         this.n_cat = ID_RANGE_CAT[0]; // 451 through 500
 
-        // init cat positions
-        this.catPos = {};
+        // init cat info
+        this.catInfo = {}; // pos, type, params
 
         // init block mask
         this.objMask = [];
@@ -174,9 +176,15 @@ class Objects {
                 }
                 else if (lvl_layout[i][j] == SYMBOL_CAT) {
                     this.objMask[i].push(this.n_cat);
-                    this.catPos[this.n_cat] = [i, j];
-                    setCatMoveBasic(this.n_cat)
-//                    catMove[this.n_cat] = setInterval(catMoveFuncBasic, 1000, this.n_cat);
+                    this.catInfo[this.n_cat] = {"pos": [i, j], "type": null, "params": null};
+                    if (LVL < LVL_FAST_BASIC_CATS) {
+                        this.catInfo[this.n_cat]["type"] = "basic";
+                    }
+                    else {
+                        this.catInfo[this.n_cat]["type"] = "basicFast";
+                    }
+                    this.catInfo[this.n_cat]["params"] = {"speed": "slow"};
+//                    setCatMoveBasic(this.n_cat)
                     this.n_cat += 1;
                 }
                 else {
@@ -226,6 +234,10 @@ class Objects {
         if      (type == "block")  { return '26px'; }
         else if (type == "cheese") { return '18px'; }
         else if (type == "cat")    { return '24px'; }
+    }
+    initCatsMovement() {
+        Object.keys(this.catInfo).forEach(n => catMoveFunc(n));
+//        catMoveFunc(this.n_cat);
     }
 
     // status check methods
@@ -367,7 +379,8 @@ class Objects {
 
         // if cat, update its pos array
         if (isCat(n)) {
-            this.catPos[n] = [i_end, j_end];
+            this.catInfo[n]["pos"] = [i_end, j_end];
+//            this.catPos[n] = [i_end, j_end];
         }
     }
     remove(pos) {
@@ -377,7 +390,8 @@ class Objects {
     turnCatIntoCheese(n) {
         // get info
         let elem = document.getElementById("object" + n.toString());
-        let pos = this.catPos[n];
+//        let pos = this.catPos[n];
+        let pos = this.catInfo[n]["pos"];
         let n_new = this.n_cheese;
         this.n_cheese += 1;
 
@@ -390,7 +404,8 @@ class Objects {
         this.objMask[pos[0]][pos[1]] = n_new;
 
         // remove cat pos
-        delete this.catPos[n];
+        delete this.catInfo[n];
+//        delete this.catPos[n];
     }
 }
 
@@ -520,6 +535,7 @@ function go_to_level(lvl=null) {
     let board = BLOCK_BIN_MASK[LVL];
     mouseInfo = new Mouse(board);
     objectsInfo = new Objects(board);
+    objectsInfo.initCatsMovement();
 
     // update game info
     if (lvl == null) {
@@ -609,9 +625,10 @@ function didCatTrapMouse() {
     if (objectsInfo == undefined || mouseInfo == undefined) {
         return;
     }
-    for (const pos of Object.values(objectsInfo.catPos)) {
-        if (hasMouse(pos)) {
+    for (const cat of Object.values(objectsInfo.catInfo)) {
+        if (hasMouse(cat["pos"])) {
             game_over();
+            break;
         }
     }
 }
@@ -646,27 +663,66 @@ function getObjectTypeFromId(n) {
 
 
 /*  CAT MOVEMENT */
+function catMoveFunc(n) {
+    let cat = objectsInfo.catInfo[n];
+    let catType = cat["type"];
+    let status;
+    switch(catType) {
+        case "basic": { // no params
+            catMoveFuncBasic(n) ? clearCatMove(n) : setCatMoveBasic(n);
+            break;
+        }
+        case "basicFast": { // params: speed
+            catMoveFuncBasic(n) ? clearCatMove(n) : setCatMoveBasic(n);
+            break;
+        }
+    }
+}
+
+function setCatMoveBasic(n) {
+    if (n in catMove) {
+        clearInterval(catMove[n]);
+    }
+    let cat = objectsInfo.catInfo[n];
+    let speed = cat["params"]["speed"]
+    switch(speed) {
+        case "slow": dur = getCatMoveBasicDurSlow(); break;
+        case "fast": dur = getCatMoveBasicDurFast(); break;
+        default:     dur = getCatMoveBasicDurSlow(); break;
+    }
+    catMove[n] = setInterval(catMoveFunc, dur, n);
+}
+
 function catMoveFuncBasic(n) {
-    let catPos = objectsInfo.catPos[n];
+    let cat = objectsInfo.catInfo[n];
+    let catPos = cat["pos"];
     let freePos = objectsInfo.freeCellsAround(catPos);
     if (freePos.length) { // cat can move (random or chase)
         let mousePos = mouseInfo.pos;
         let i;
         if (distEuclidean(catPos, mousePos) > DETECT_RADIUS) {
             i = getNextCatPosRandom(freePos.length);
-            if (LVL >= LVL_FAST_BASIC_CATS) { setCatMoveBasic(n, "slow"); }
+            if (cat["type"] == "basicFast") { cat["params"]["speed"] = "slow"; }
+//            if (LVL >= LVL_FAST_BASIC_CATS) { setCatMoveBasic(n, "slow"); }
         }
         else {
             i = getNextCatPosChaseBasic(mousePos, catPos, freePos);
-            if (LVL >= LVL_FAST_BASIC_CATS) { setCatMoveBasic(n, "fast") };
+            if (cat["type"] == "basicFast") { cat["params"]["speed"] = "fast"; }
+//            if (LVL >= LVL_FAST_BASIC_CATS) { setCatMoveBasic(n, "fast") };
         }
         objectsInfo.move(catPos[0], catPos[1], freePos[i][0], freePos[i][1]);
-        objectsInfo.catPos[n] = freePos[i];
+        objectsInfo.catInfo[n]["pos"] = freePos[i];
     }
     else { // cat is trapped, turns into cheese
-        objectsInfo.turnCatIntoCheese(n);
-        clearCatMove(n);
+        processCatToCheese(n);
+        return 1;
     }
+    return 0;
+}
+
+function processCatToCheese(n) {
+    objectsInfo.turnCatIntoCheese(n);
+    clearCatMove(n);
 }
 
 function getNextCatPosRandom(numChoices) {
@@ -688,17 +744,17 @@ function getNextCatPosChaseBasic(mousePos, catPos, freePos) {
     return i;
 }
 
-function setCatMoveBasic(n, speed="slow") {
-    if (n in catMove) {
-        clearInterval(catMove[n]);
-    }
-    switch(speed) {
-        case "slow": dur = getCatMoveBasicDurSlow(); break;
-        case "fast": dur = getCatMoveBasicDurFast(); break;
-        default:     dur = getCatMoveBasicDurSlow(); break;
-    }
-    catMove[n] = setInterval(catMoveFuncBasic, dur, n);
-}
+//function setCatMoveBasic(n, speed="slow") {
+//    if (n in catMove) {
+//        clearInterval(catMove[n]);
+//    }
+//    switch(speed) {
+//        case "slow": dur = getCatMoveBasicDurSlow(); break;
+//        case "fast": dur = getCatMoveBasicDurFast(); break;
+//        default:     dur = getCatMoveBasicDurSlow(); break;
+//    }
+//    catMove[n] = setInterval(catMoveFuncBasic, dur, n);
+//}
 
 function getCatMoveBasicDurSlow() {
     return CAT_MOVE_BASIC_SLOW_MIN + CAT_MOVE_BASIC_SLOW_RANGE * Math.random();
@@ -717,6 +773,13 @@ function clearCatMove(n=null) {
         delete catMove[n];
     }
 }
+
+function catMoveFuncPathFinding(n) {
+
+}
+
+
+
 
 
 
