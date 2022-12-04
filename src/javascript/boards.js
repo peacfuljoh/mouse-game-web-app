@@ -41,7 +41,9 @@ BLOCK_BIN_MASK[L] = [
     "B---------B--------B"
 ];
 
-addO(CAT_TYPES[L], 0, "basic");
+//addO(CAT_TYPES[L], 0, "basic");
+//addO(CAT_PARAMS[L], 0, BASIC_SPEED);
+addO(CAT_TYPES[L], 0, "pathFinding");
 addO(CAT_PARAMS[L], 0, BASIC_SPEED);
 
 // level 1

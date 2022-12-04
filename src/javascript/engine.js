@@ -708,20 +708,17 @@ function catMoveFuncGeneral(n) {
                 break;
             }
             case "pathFinding": {
-                newPos = catMoveFuncPathFinding(n);
+                newPos = catMoveFuncPathFinding(n, freePos);
                 break;
             }
         }
-        if (newPos != undefined) {
-            objectsInfo.move(catPos[0], catPos[1], newPos[0], newPos[1]);
-            objectsInfo.catInfo[n]["pos"] = newPos; // TODO: do this in objectsInfo.move(...) call
-        }
-        return 1;
+        if (newPos) { objectsInfo.move(catPos[0], catPos[1], newPos[0], newPos[1]); }
+        return true;
     }
     else { // cat is trapped, turns into cheese
         processCatToCheese(n);
     }
-    return 0;
+    return false;
 }
 
 function catMoveFuncBasic(n, freePos) {
@@ -778,16 +775,126 @@ function getNextCatPosChaseBasic(mousePos, catPos, freePos) {
 }
 
 /*  CAT MOVEMENT: PATHFINDING */
-function catMoveFuncPathFinding(n) {
-    let objMask = objectsInfo.objMask;
+function catMoveFuncPathFinding(n, freePos) {
+    let i, j, ii, jj, cost, parentPos, newHeadNodes, nextIndex, minCost, node;
 
+    let mousePos = mouseInfo.pos;
+
+    // init free space mask (0 = occupied, 1 = free, node = node)
+    const dMask = [];
+    for (i = 0; i < GRIDSIZE[0]; i++) {
+        dMask.push([]);
+        for (j = 0; j < GRIDSIZE[1]; j++) {
+            dMask[i].push(
+                (objectsInfo.objMask[i][j] == 0) ? 1 : 0
+            );
+        }
+    }
+//    const dMask = objectsInfo.objMask.map( f_i(row) {
+//        return row.map( f_j(val) { return !val; });
+//    });
+
+    // init node list
+    let catPos = objectsInfo.catInfo[n]["pos"];
+    let nodeList = [catPos];
+    dMask[catPos[0]][catPos[1]] = new PathFindingNode(catPos);
+    while (true) {
+        // failed to find mouse
+        if (nodeList.length == 0) {
+            deAllocateDMask(dMask);
+            return catMoveFuncBasic(n, freePos);
+        }
+
+        // choose lowest-cost node from active list
+        nextIndex = 0;
+        if (nodeList.length > 1) {
+            minCost = Infinity;
+            for (i = 1; i < nodeList.length; i++) {
+                ii = nodeList[i][0];
+                jj = nodeList[i][1];
+                cost = dMask[ii][jj].cost;
+                if (cost < minCost) {
+                    minCost = cost;
+                    nextIndex = i;
+                }
+            }
+        }
+        i = nodeList[nextIndex][0];
+        j = nodeList[nextIndex][1];
+        nodeList.splice(nextIndex, 1); // remove from list
+
+        // check for mouse and backtrack, otherwise expand
+        if (mousePos[0] == i && mousePos[1] == j) {
+            let fullPath = [[i, j]];
+            node = dMask[i][j];
+            while (node.parent.parent != null) {
+                node = node.parent;
+                fullPath.push(node.pos);
+            }
+            console.log(fullPath);
+            deAllocateDMask(dMask);
+            return node.pos;
+        }
+        else {
+            newHeadNodes = dMask[i][j].expand(dMask);
+            nodeList = nodeList.concat(newHeadNodes);
+        }
+    }
+}
+
+function deAllocateDMask(d){
+    for (let i = 0; i < GRIDSIZE[0]; i++) {
+        for (let j = 0; j < GRIDSIZE[1]; j++) {
+            if (d[i][j] instanceof PathFindingNode) {
+                delete d[i][j];
+            }
+        }
+    }
+}
+
+class PathFindingNode {
+    constructor(pos, parent=null, cost=0) {
+        this.pos = pos; // [i, j]
+        this.parent = parent; // PathFindingNode instance
+        this.cost = cost; // Number
+    }
+    expand(mask) {
+        let i, j, costMove;
+        let i_start = (this.pos[0] == 0) ? 0 : this.pos[0] - 1;
+        let i_end = (this.pos[0] == GRIDSIZE[0] - 1) ? GRIDSIZE[0] - 1 : this.pos[0] + 1;
+        let j_start = (this.pos[1] == 0) ? 0 : this.pos[1] - 1;
+        let j_end = (this.pos[1] == GRIDSIZE[1] - 1) ? GRIDSIZE[1] - 1 : this.pos[1] + 1;
+        let newNodes = [];
+        for (i = i_start; i <= i_end; i++) {
+            for (j = j_start; j <= j_end; j++) {
+//                if (i == this.pos[0] && j == this.pos[1]) { continue; }
+                if (mask[i][j] === 1) { // unoccupied
+                    costMove = getCatMoveCost(this.pos, [i, j]);
+                    mask[i][j] = new PathFindingNode([i, j], this, this.cost + costMove);
+                    newNodes.push([i, j]);
+                }
+                else if (mask[i][j] instanceof PathFindingNode) {
+                    costMove = getCatMoveCost(this.pos, [i, j]);
+                    if (this.cost + costMove < mask[i][j].cost) {
+                        mask[i][j].parent = this;
+                        mask[i][j].cost = this.cost + costMove;
+                    }
+                }
+            }
+        }
+        return newNodes;
+    }
+}
+
+function getCatMoveCost(x, y) {
+    return (x[0] == y[0] || x[1] == y[1]) ? 1 : 1.41421356237;
 }
 
 function setCatMovePathFinding(n) {
     if (n in catMove) {
         clearInterval(catMove[n]);
     }
-    catMove[n] = setInterval(catMoveFunc, 500, n);
+    catMove[n] = setInterval(catMoveFunc, 250, n);
 }
 
 
