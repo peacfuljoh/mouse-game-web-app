@@ -178,25 +178,25 @@ TIME_REMAIN_ALL[L] = 180;
 L = 5;
 BLOCK_BIN_MASK[L] = [
     "--BB------------BB--",
-    "----A--BB----BB---A-",
-    "FFFFFFF--------BBBBB",
-    "--BBBBBB----------B-",
+    "-------BB---BB------",
+    "FFFFFFF--------B--BB",
+    "--BBBBBB-----BB---B-",
     "BBB---BB---------B--",
     "BB-----BBB-----BB---",
-    "B-------------BB----",
-    "-------------BB-----",
-    "---BB--M------------",
-    "-BBB----------------",
+    "B-------------BB--A-",
+    "-------------BB----A",
+    "---BB------------A--",
+    "-BBB--------------A-",
     "----------BBB--BBFFF",
     "--FFFFFF--BB--------",
     "---------BB---BBB---",
     "BBBB--BB------BB---F",
-    "BBB-BBBB------------",
-    "-BBB--BB---BB----FFA",
-    "---BBB--A---BBBBFFFF",
+    "BBB-BBBB----------FF",
+    "-BBB--BB---BB----FFF",
+    "---BBB------BBBBFFFF",
     "-BB-BBB--BB-------FF",
     "BB-------------FFFFF",
-    "BB-FF-FFFFFFFFFFFFFF"
+    "BBMFF-FFFFFFFFFFFFFF"
 ]
 
 catNums = [0, 1, 2, 3];
@@ -215,11 +215,11 @@ BLOCK_BIN_MASK[L] = [
     "----B-B---B----B----",
     "FFBBB---B----B--B---",
     "-------B-------B----",
-    "----B---B-B---B-----",
+    "----B---B--B--B-----",
     "--B---B--FFBFF----B-",
     "B---B----F---F-B----",
     "---B-----FA-AF------",
-    "-B-------FH-HF--B---",
+    "-B-------FHHHF--B---",
     "---B-B---FFFFF------",
     "--B----B-----B---B--",
     "---B--B---B---B--B-",
@@ -241,7 +241,79 @@ catNums.forEach(i => addO(CAT_PARAMS[L], i, BASIC_SPEED));
 
 TIME_REMAIN_ALL[L] = 300;
 
-//L = --;
+// level 7
+L = 7;
+BLOCK_BIN_MASK[L] = [
+    "----AA------AA------",
+    "--FFFFFF---FFFFFFF--",
+    "-------F---F--------",
+    "FFFFFF-F-M-F--FFFF--",
+    "-------F---F--FH----",
+    "-FFF-FFF---F----HF--",
+    "----B--F---F--FFFF--",
+    "B------F---F----A---",
+    "---A--FF---FFFFFFFFF",
+    "FHBFHFFF---F--------",
+    "FFFFFFFF---F--BFFF--",
+    "--A----F---F--FF----",
+    "--FFF--F---F--FHHF--",
+    "--FH---F---F--FFFF--",
+    "--FFF--F---F-----A--",
+    "---HF--F---FFFF--FFF",
+    "--FFF--F---F-B-B-B--",
+    "-------F---F--B-B-B-",
+    "--FFFFFF---FFFFFFF--",
+    "--------------------"
+]
+
+catNums = [0, 1, 2, 3, 4, 5];
+catNums.forEach(i => addO(CAT_TYPES[L], i, "evasive"));
+catNums.forEach(i => addO(CAT_PARAMS[L], i, BASIC_SPEED));
+
+catNums = [6, 7];
+catNums.forEach(i => addO(CAT_TYPES[L], i, "pathFinding"));
+catNums.forEach(i => addO(CAT_PARAMS[L], i, BASIC_SPEED));
+
+TIME_REMAIN_ALL[L] = 120;
+
+// level 8
+L = 8;
+BLOCK_BIN_MASK[L] = [
+    "FFFFFFFFFFFFFFFFFFFF",
+    "F-AHF---FHHF-HAF---F",
+    "F---F---F--F---F---F",
+    "FBBBFBBBF--FBBBFBBBF",
+    "F------------------F",
+    "F-------FFFF-------F",
+    "F---F----------F---F",
+    "F---F----------F---F",
+    "F---F---FBBF---F---F",
+    "F---F---B--B---F---F",
+    "F---F---BM-B---F---F",
+    "F---F---FBBF---F---F",
+    "F---F----------F---F",
+    "F---F----------F---F",
+    "F-------FFFF-------F",
+    "F------------------F",
+    "FBBBFBBBF--FBBBFBBBF",
+    "F-A-F---F--F-A-F---F",
+    "FH--F---FHHFH--F---F",
+    "FFFFFFFFFFFFFFFFFFFF"
+];
+
+TIME_REMAIN_ALL[L] = 120;
+
+catNums = [0, 1, 2, 3];
+catNums.forEach(i => addO(CAT_TYPES[L], i, "strong"));
+catNums.forEach(i => addO(CAT_PARAMS[L], i, BASIC_SPEED));
+
+
+
+
+
+
+//// level 8
+//L = 8;
 //BLOCK_BIN_MASK[L] = [
 //    "--------------------",
 //    "--------------------",
@@ -263,7 +335,7 @@ TIME_REMAIN_ALL[L] = 300;
 //    "--------------------",
 //    "--------------------",
 //    "--------------------"
-//]
+//];
 
 
 
