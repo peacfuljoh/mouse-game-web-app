@@ -1,15 +1,12 @@
 /* Main functionality for mouse game */
 /*
 TODO: more cats
-TODO:   smart cats (path-finding)
-TODO:   jumping cats (can leap over a single block)
 TODO:   strong cats (can push blocks)
-TODO:   laser cats (can shoot lasers)
+TODO:   jumping cats (can leap over a single block)
 TODO:   cat den (spawns new cats, destroyed with a bomb)
 TODO:   stealth cat (invisible when not moving)
-TODO:   guard cats (stay in certain area)
+TODO:   guard cats (stay in certain area, attack if approached)
 TODO: more terrain
-TODO:   heavy blocks (can't be moved)
 TODO:   rivers
 TODO:   more interesting background
 TODO:   teleport pads (only mouse)
@@ -22,8 +19,13 @@ TODO:   force push (move block stack max distance)
 TODO:   shield (can pick up in some levels from cat fortresses)
 TODO:   bomb (can pick up, used to destroy heavy blocks and cat dens)
 
-TODO: fix bug (game over screen goes away if mouse runs through cat)
+TODO: cat fortress every 5 levels
+TODO:   many fixed blocks and cat den
+TODO:   must pick up bomb and destroy cat den
+TODO:   get power-up after each one
 
+TODO: next level screen (use timeout w/ release on ENTER keypress)
+TODO: allow for next level if no cheese left after time runs out (easy vs hard modes)
 */
 
 
@@ -45,6 +47,8 @@ let catMove = {};
 let GAME_OVER = true;
 
 let HIGH_SCORE = 0;
+
+
 
 
 
@@ -150,6 +154,7 @@ class Objects {
         this.n_block = ID_RANGE_BLOCK[0]; // 1 through 400
         this.n_cheese = ID_RANGE_CHEESE[0]; // 401 through 450
         this.n_cat = ID_RANGE_CAT[0]; // 451 through 500
+        this.n_block_fixed = ID_RANGE_BLOCK_FIXED[0]; // 501 through 900
 
         // init cat info
         this.catInfo = {}; // pos, type, params
@@ -157,9 +162,6 @@ class Objects {
         // init block mask
         this.objMask = [];
         this.initObjMask(lvl_layout);
-
-        // draw all objects
-        this.draw();
     }
     initObjMask(lvl_layout) {
         let n_empty = 0; // empty cells
@@ -169,6 +171,10 @@ class Objects {
                 if (lvl_layout[i][j] == SYMBOL_BLOCK) {
                     this.objMask[i].push(this.n_block);
                     this.n_block += 1;
+                }
+                else if (lvl_layout[i][j] == SYMBOL_BLOCK_FIXED) {
+                    this.objMask[i].push(this.n_block_fixed);
+                    this.n_block_fixed += 1;
                 }
                 else if (lvl_layout[i][j] == SYMBOL_CHEESE) {
                     this.objMask[i].push(this.n_cheese);
@@ -196,13 +202,13 @@ class Objects {
             for (let j = 0; j < GRIDSIZE[1]; j++) {
                 n = this.objMask[i][j];
                 if (n != 0) {
-                    text += this.addObjectText(i, j, getObjectTypeFromId(n));
+                    text += this.addObjectText(i, j, getObjectTypeFromId(n), getCatType(n));
                 }
             }
         }
         OBJECTS_DIV.innerHTML = text;
     }
-    addObjectText(i, j, type) {
+    addObjectText(i, j, type, catType) {
         let top = BLOCK_PX_TOP0 + i * BLOCK_PX_PER_CELL;
         let left = BLOCK_PX_LEFT0 + j * BLOCK_PX_PER_CELL;
         if (type == "cheese") { top += 2; }
@@ -210,15 +216,13 @@ class Objects {
 
         let text = '';
         text += '<img id="object' + n.toString() + '" src=';
-        if      (type == "block")  { text += '"' + ASSET_PATH_BLOCK + '"';  }
-        else if (type == "cheese") { text += '"' + ASSET_PATH_CHEESE + '"'; }
-        else if (type == "cat")    { text += '"' + ASSET_PATH_CAT + '"';    }
+        text += '"' + this.getObjectAssetPath(type, catType) + '"';
         text += ' style="';
         text += ' top:' + top.toString() + 'px;';
         text += ' left:' + left.toString() + 'px;';
         text += ' position:absolute;';
         text += ' border-radius:20%;';
-        text += ' height:' + this.getObjectTextHeight(type) + ';';
+        text += ' height:' + this.getObjectTextHeight(type, catType) + ';';
         text += ' z-order:5;'
         text += '"';
         text += '>';
@@ -226,10 +230,44 @@ class Objects {
 
         return text;
     }
-    getObjectTextHeight(type) {
-        if      (type == "block")  { return '26px'; }
-        else if (type == "cheese") { return '18px'; }
-        else if (type == "cat")    { return '24px'; }
+    getObjectAssetPath(type, catType) {
+        switch(type) {
+            case "block":
+                return ASSET_PATH_BLOCK;
+            case "blockFixed":
+                return ASSET_PATH_BLOCK_FIXED;
+            case "cheese":
+                return ASSET_PATH_CHEESE;
+            case "cat": {
+                switch(catType) {
+                    case "basic":
+                    case "basicFast":
+                        return ASSET_PATH_CAT_BASIC;
+                    case 'pathFinding':
+                        return ASSET_PATH_CAT_PATH_FINDING;
+                    case "evasive":
+                        return ASSET_PATH_CAT_EVASIVE;
+                }
+            }
+        }
+    }
+    getObjectTextHeight(type, catType) {
+        switch(type) {
+            case "block":
+            case "blockFixed":
+                return '26px';
+            case "cheese":
+                return '18px';
+            case "cat": {
+                switch(catType) {
+                    case "basic":
+                    case "basicFast":
+                    case 'pathFinding':
+                    case "evasive":
+                        return '24px';
+                }
+            }
+        }
     }
     initCatsMovement() {
         Object.keys(this.catInfo).forEach(n => catMoveFunc(n));
@@ -239,8 +277,8 @@ class Objects {
     hasEmpty(pos) {
         return this.objMask[pos[0]][pos[1]] == 0;
     }
-    hasBlock(pos) {
-        return isBlock(this.objMask[pos[0]][pos[1]]);
+    hasFixedBlock(pos) {
+        return isFixedBlock(this.objMask[pos[0]][pos[1]]);
     }
     hasCheese(pos) {
         return isCheese(this.objMask[pos[0]][pos[1]]);
@@ -249,7 +287,7 @@ class Objects {
         return isCat(this.objMask[pos[0]][pos[1]]);
     }
     canPush(next_pos, dir_) {
-        let canPush = false;
+        let canPush_ = false;
         let i = next_pos[0];
         let j = next_pos[1];
         let increment;
@@ -271,12 +309,14 @@ class Objects {
                 break;
             }
         }
-        while (!canPush && i >= 0 && i <= GRIDSIZE[0] - 1 && j >= 0 && j <= GRIDSIZE[1] - 1) {
-            canPush ||= (this.hasEmpty([i, j]) || this.hasCheese([i, j]));
+        while (!canPush_ &&
+                (i >= 0 && i <= GRIDSIZE[0] - 1 && j >= 0 && j <= GRIDSIZE[1] - 1) &&
+                !this.hasFixedBlock([i, j])) {
+            canPush_ ||= (this.hasEmpty([i, j]) || this.hasCheese([i, j]));
             increment();
         }
 
-        return canPush;
+        return canPush_;
     }
     anyCheeseRemaining() {
         for (let i = 0; i < GRIDSIZE[0]; i++) {
@@ -421,6 +461,14 @@ document.onkeypress = function(e) {
         case "a":
             mouseInfo.move("left");
             break;
+        case "+":
+            timeRemain = 0;
+            go_to_level(Math.min(MAX_LVL, LVL + 1));
+            break;
+        case "-":
+            timeRemain = 0;
+            go_to_level(Math.max(0, LVL - 1));
+            break;
     }
 }
 
@@ -530,6 +578,7 @@ function go_to_level(lvl=null) {
     let board = BLOCK_BIN_MASK[LVL];
     mouseInfo = new Mouse(board);
     objectsInfo = new Objects(board);
+    objectsInfo.draw();
     objectsInfo.initCatsMovement();
 
     // update game info
@@ -636,6 +685,10 @@ function isBlock(n) {
     return n >= ID_RANGE_BLOCK[0] && n <= ID_RANGE_BLOCK[1];
 }
 
+function isFixedBlock(n) {
+    return n >= ID_RANGE_BLOCK_FIXED[0] && n <= ID_RANGE_BLOCK_FIXED[1];
+}
+
 function isCheese(n) {
     return n >= ID_RANGE_CHEESE[0] && n <= ID_RANGE_CHEESE[1];
 }
@@ -649,10 +702,16 @@ function isEdible(n) {
 }
 
 function getObjectTypeFromId(n) {
-    if (isBlock(n))  { return "block";  }
-    if (isCheese(n)) { return "cheese"; }
-    if (isCat(n))    { return "cat";    }
+    if (isBlock(n))      { return "block";  }
+    if (isCheese(n))     { return "cheese"; }
+    if (isCat(n))        { return "cat";    }
+    if (isFixedBlock(n)) { return "blockFixed"; }
     return "";
+}
+
+function getCatType(n) {
+    if (isCat(n)) { return objectsInfo.catInfo[n].type; }
+    return null;
 }
 
 
@@ -661,15 +720,19 @@ function getObjectTypeFromId(n) {
 function catMoveFunc(n) {
     let cat = objectsInfo.catInfo[n];
     let catType = cat["type"];
+    clearCatMove(n);
     switch(catType) {
         case "basic":
         case "basicFast": {
-            catMoveFuncGeneral(n) ? setCatMoveBasic(n) : clearCatMove(n);
+            catMoveFuncGeneral(n) ? setCatMoveBasic(n) : null;
             break;
         }
         case "pathFinding": {
-            catMoveFuncGeneral(n) ? setCatMovePathFinding(n) : clearCatMove(n);
+            catMoveFuncGeneral(n) ? setCatMovePathFinding(n) : null;
             break;
+        }
+        case "evasive": {
+            catMoveFuncGeneral(n) ? setCatMoveEvasive(n) : null;
         }
     }
 }
@@ -708,7 +771,11 @@ function catMoveFuncGeneral(n) {
                 break;
             }
             case "pathFinding": {
-                newPos = catMoveFuncPathFinding(n, freePos);
+                newPos = catMoveFuncPathFinding(n, mouseInfo.pos, freePos);
+                break;
+            }
+            case "evasive": {
+                newPos = catMoveFuncEvasive(n, mouseInfo.pos, freePos);
                 break;
             }
         }
@@ -724,15 +791,17 @@ function catMoveFuncGeneral(n) {
 function catMoveFuncBasic(n, freePos) {
     let mousePos = mouseInfo.pos;
     let cat = objectsInfo.catInfo[n];
-    let catPos = cat["pos"];
+    let catPos = cat.pos;
+    let catType = cat.type;
+    let canChangeSpeed = catType == "basicFast";
     let i;
     if (distEuclidean(catPos, mousePos) > DETECT_RADIUS) {
         i = getNextCatPosRandom(freePos.length);
-        if (cat["type"] == "basicFast") { cat["params"]["speed"] = "slow"; }
+        if (canChangeSpeed) { cat["params"]["speed"] = "slow"; }
     }
     else {
         i = getNextCatPosChaseBasic(mousePos, catPos, freePos);
-        if (cat["type"] == "basicFast") { cat["params"]["speed"] = "fast"; }
+        if (canChangeSpeed) { cat["params"]["speed"] = "fast"; }
     }
     return freePos[i];
 }
@@ -759,13 +828,14 @@ function getCatMoveBasicDurFast() {
     return CAT_MOVE_BASIC_FAST_MIN + CAT_MOVE_BASIC_FAST_RANGE * Math.random();
 }
 
-function getNextCatPosChaseBasic(mousePos, catPos, freePos) {
-    let dirVec = [mousePos[0] - catPos[0], mousePos[1] - catPos[1]];
+function getNextCatPosChaseBasic(mousePos, catPos, freePos, mode="chase") {
+    let dirVec = (mode == "chase") ? subVec(mousePos, catPos) : subVec(catPos, mousePos);
     let innerProd = [];
     let val;
     let maxVal = -2;
     for (const [n, vec] of freePos.entries()) {
-        val = innerProdNormalized([vec[0] - catPos[0], vec[1] - catPos[1]], dirVec);
+        val = innerProdNormalized(subVec(vec, catPos), dirVec);
+//        val = innerProdNormalized([vec[0] - catPos[0], vec[1] - catPos[1]], dirVec);
         if (val > maxVal) {
             maxVal = val;
             i = n;
@@ -775,63 +845,52 @@ function getNextCatPosChaseBasic(mousePos, catPos, freePos) {
 }
 
 /*  CAT MOVEMENT: PATHFINDING */
-function catMoveFuncPathFinding(n, freePos) {
-    let i, j, ii, jj, cost, parentPos, newHeadNodes, nextIndex, minCost, node;
-
-    let mousePos = mouseInfo.pos;
+function catMoveFuncPathFinding(n, tgtPos, freePos) {
+    let i, j, newHeadNodes, nextIndex;
 
     // init free space mask (0 = occupied, 1 = free, node = node)
-    const dMask = [];
-    for (i = 0; i < GRIDSIZE[0]; i++) {
-        dMask.push([]);
-        for (j = 0; j < GRIDSIZE[1]; j++) {
-            dMask[i].push(
-                (objectsInfo.objMask[i][j] == 0) ? 1 : 0
-            );
-        }
-    }
-//    const dMask = objectsInfo.objMask.map( f_i(row) {
-//        return row.map( f_j(val) { return !val; });
-//    });
+    const dMask = objectsInfo.objMask.map(function f_row(row) {
+        return row.map(function f_col(val) {
+            return Number(val == 0);
+        });
+    });
 
     // init node list
-    let catPos = objectsInfo.catInfo[n]["pos"];
-    let nodeList = [catPos];
-    dMask[catPos[0]][catPos[1]] = new PathFindingNode(catPos);
+    let cat = objectsInfo.catInfo[n];
+    let catPos = cat["pos"];
+    let node = new PathFindingNode(catPos);
+    dMask[catPos[0]][catPos[1]] = node;
+    let nodeList = [node];
     while (true) {
         // failed to find mouse
         if (nodeList.length == 0) {
+            cat["params"]["speed"] = "slow";
             deAllocateDMask(dMask);
             return catMoveFuncBasic(n, freePos);
         }
 
         // choose lowest-cost node from active list
         nextIndex = 0;
-        if (nodeList.length > 1) {
-            minCost = Infinity;
-            for (i = 1; i < nodeList.length; i++) {
-                ii = nodeList[i][0];
-                jj = nodeList[i][1];
-                cost = dMask[ii][jj].cost;
-                if (cost < minCost) {
-                    minCost = cost;
-                    nextIndex = i;
-                }
+        for (i = 0; i < nodeList.length; i++) {
+            if (nodeList[i].cost < nodeList[nextIndex].cost) {
+                nextIndex = i;
             }
         }
-        i = nodeList[nextIndex][0];
-        j = nodeList[nextIndex][1];
+        i = nodeList[nextIndex].pos[0];
+        j = nodeList[nextIndex].pos[1];
         nodeList.splice(nextIndex, 1); // remove from list
 
         // check for mouse and backtrack, otherwise expand
-        if (mousePos[0] == i && mousePos[1] == j) {
+        if (tgtPos[0] == i && tgtPos[1] == j) {
             let fullPath = [[i, j]];
             node = dMask[i][j];
+//            console.log(node.cost);
             while (node.parent.parent != null) {
                 node = node.parent;
                 fullPath.push(node.pos);
             }
-            console.log(fullPath);
+            cat["params"]["speed"] = "fast";
+//            console.log(fullPath);
             deAllocateDMask(dMask);
             return node.pos;
         }
@@ -859,19 +918,16 @@ class PathFindingNode {
         this.cost = cost; // Number
     }
     expand(mask) {
-        let i, j, costMove;
-        let i_start = (this.pos[0] == 0) ? 0 : this.pos[0] - 1;
-        let i_end = (this.pos[0] == GRIDSIZE[0] - 1) ? GRIDSIZE[0] - 1 : this.pos[0] + 1;
-        let j_start = (this.pos[1] == 0) ? 0 : this.pos[1] - 1;
-        let j_end = (this.pos[1] == GRIDSIZE[1] - 1) ? GRIDSIZE[1] - 1 : this.pos[1] + 1;
+        let i, j, costMove, newNode;
+        let [i_start, i_end, j_start, j_end] = getExpandIdxLimits(this.pos);
         let newNodes = [];
         for (i = i_start; i <= i_end; i++) {
             for (j = j_start; j <= j_end; j++) {
-//                if (i == this.pos[0] && j == this.pos[1]) { continue; }
                 if (mask[i][j] === 1) { // unoccupied
                     costMove = getCatMoveCost(this.pos, [i, j]);
-                    mask[i][j] = new PathFindingNode([i, j], this, this.cost + costMove);
-                    newNodes.push([i, j]);
+                    newNode = new PathFindingNode([i, j], this, this.cost + costMove);
+                    mask[i][j] = newNode;
+                    newNodes.push(newNode);
                 }
                 else if (mask[i][j] instanceof PathFindingNode) {
                     costMove = getCatMoveCost(this.pos, [i, j]);
@@ -886,15 +942,75 @@ class PathFindingNode {
     }
 }
 
+function getExpandIdxLimits(pos) {
+    let i_start = (pos[0] == 0) ? 0 : pos[0] - 1;
+    let i_end = (pos[0] == GRIDSIZE[0] - 1) ? GRIDSIZE[0] - 1 : pos[0] + 1;
+    let j_start = (pos[1] == 0) ? 0 : pos[1] - 1;
+    let j_end = (pos[1] == GRIDSIZE[1] - 1) ? GRIDSIZE[1] - 1 : pos[1] + 1;
+    return [i_start, i_end, j_start, j_end];
+}
+
 function getCatMoveCost(x, y) {
-    return (x[0] == y[0] || x[1] == y[1]) ? 1 : 1.41421356237;
+    return (x[0] == y[0] || x[1] == y[1]) ? 1.0 : 1.41421356237; // sqrt(2)
 }
 
 function setCatMovePathFinding(n) {
-    if (n in catMove) {
-        clearInterval(catMove[n]);
+    setCatMoveBasic(n);
+}
+
+/* CAT MOVEMENT: EVASIVE */
+function catMoveFuncEvasive(n, tgtPos, freePos) {
+    let scores, i, j, maxVal, newTgtPos;
+
+    let cat = objectsInfo.catInfo[n];
+    let catPos = cat.pos;
+
+    // init free space mask (0 = occupied, 1 = free)
+    const dMask = objectsInfo.objMask.map(function f_row(row) {
+        return row.map(function f_col(val) {
+            return Number(val == 0);
+        });
+    });
+
+    // find all reachable cells
+    let reachableCells = [];
+    let posList = [catPos];
+    dMask[catPos[0]][catPos[1]] = 0;
+    while (posList.length) {
+        let pos = posList.shift();
+        let [i_start, i_end, j_start, j_end] = getExpandIdxLimits(pos);
+        for (i = i_start; i <= i_end; i++) {
+            for (j = j_start; j <= j_end; j++) {
+                if (dMask[i][j]) {
+                    dMask[i][j] = 0;
+                    posList.push([i, j]);
+                    reachableCells.push([i, j]);
+                }
+            }
+        }
     }
-    catMove[n] = setInterval(catMoveFunc, 250, n);
+
+    // identify cell furthest from mouse
+    scores = [];
+    for (pos of reachableCells) {
+        scores.push(distEuclidean(pos, tgtPos));
+    }
+    maxVal = Math.max(...scores);
+    i = scores.indexOf(maxVal);
+    newTgtPos = reachableCells[i];
+
+    // find next move towards new target cell
+    let newPos = catMoveFuncPathFinding(n, newTgtPos, freePos);
+
+    // update speed (is changed in call to catMoveFuncPathFinding()
+    if (distEuclidean(catPos, tgtPos) > DETECT_RADIUS) { cat["params"]["speed"] = "slow"; }
+    else                                               { cat["params"]["speed"] = "fast"; }
+
+    return newPos;
+}
+
+function setCatMoveEvasive(n) {
+    setCatMoveBasic(n);
 }
 
 
@@ -920,4 +1036,12 @@ function innerProdNormalized(x, y) {
 
 function L2Norm(x) {
     return Math.sqrt(x.reduce((sum, x) => sum + x ** 2, 0))
+}
+
+function subVec(x, y) {
+    return x.map((e, i) => e - y[i]);
+}
+
+function addVec(x, y) {
+    return x.map((e, i) => e + y[i]);
 }
