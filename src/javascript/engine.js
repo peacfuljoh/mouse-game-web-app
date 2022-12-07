@@ -11,8 +11,6 @@ TODO: cat fortress on levels 5, 10, and 15
 TODO:   many fixed blocks and cat den
 TODO:   must pick up bomb and destroy cat den
 TODO:   get power-up after each one
-
-TODO: next level screen (use timeout w/ release on ENTER keypress)
 */
 
 
@@ -33,8 +31,15 @@ let trapped = setInterval(isMouseDead, 10);
 let catMove = {};
 let GAME_OVER = true;
 
+let LOCKS = {lvlEnd: false, lvlStarted: false};
+let levelTransitionTimer; //
+let levelStartTimeout;
+
 let HIGH_SCORE = 0;
 let SCORE_LEVEL_START = 0;
+
+let meowLock = {};
+
 
 
 
@@ -58,7 +63,7 @@ class Mouse {
         this.isAlive = true;
     }
     move(dir_) {
-        if (!this.isAlive) {
+        if (!this.isAlive || !LOCKS["lvlStarted"]) {
             return;
         }
 
@@ -117,7 +122,7 @@ class Mouse {
                 objectsInfo.pushObjects(next_pos, dir_);
                 this.pos = next_pos;
             }
-            // otherwise, unpushable blacks are in the way
+            // otherwise, unpushable block stack
         }
 
         // update icon
@@ -458,16 +463,24 @@ document.onkeypress = function(e) {
             break;
         case "=":
             timeRemain = 0;
+            LOCKS["lvlEnd"] = false;
             go_to_level(Math.min(MAX_LVL, LVL + 1));
             break;
         case "-":
             timeRemain = 0;
+            LOCKS["lvlEnd"] = false;
             go_to_level(Math.max(0, LVL - 1));
             break;
         case "r":
             timeRemain = 0;
             update_score(null, SCORE_LEVEL_START);
+            LOCKS["lvlEnd"] = false;
             go_to_level(LVL);
+            break;
+        case "l":
+            if (LOCKS["lvlEnd"]) {
+                LOCKS["lvlEnd"] = false;
+            }
             break;
     }
 }
@@ -481,6 +494,7 @@ function new_game() {
     reset_overlay();
     timeRemain = 0;
     update_score();
+    LOCKS["lvlEnd"] = false;
     go_to_level(INIT_LVL);
 }
 
@@ -491,6 +505,9 @@ function reset_overlay() {
 
 function game_over(outcome) { // "eaten", "time", "win", "crush"
     GAME_OVER = true;
+
+    // stop timer
+    clearInterval(timer);
 
     // update mouse info
     if (outcome != "win") {
@@ -504,10 +521,6 @@ function game_over(outcome) { // "eaten", "time", "win", "crush"
 
     // show overlay
     show_game_over_overlay(outcome)
-
-    // stop timer
-    clearInterval(timer);
-    delete timer;
 }
 
 function show_game_over_overlay(outcome) {
@@ -552,24 +565,49 @@ function game_over_text(outcome) {
 }
 
 function go_to_level(lvl) {
+    // set level not started flag
+    LOCKS["lvlStarted"] = false;
+
     // freeze cats
     clearCatMove();
 
+    // update score
+    add_time_to_score();
+    SCORE_LEVEL_START = get_score();
+
     // determine level
+    console.log('a: ' + LVL);
     if (lvl <= MAX_LVL) { // next level
         LVL = lvl;
     }
     else { // game finish
-        add_time_to_score()
         game_over("win");
         return;
     }
 
-    // continue reset
+    // freeze timer
+    if (timer != undefined) {
+        clearInterval(timer);
+    }
+
+    console.log('a2: ' + LVL);
+
+    // hold on level end
+    if (LOCKS["lvlEnd"]) {
+        show_level_complete_overlay();
+        sleepLock("lvlEnd", go_to_level_finish);
+    }
+    else {
+        go_to_level_finish();
+    }
+}
+
+function go_to_level_finish() {
+    console.log('b: ' + LVL);
+    // continue level refresh
     delete mouseInfo;
     delete objectsInfo;
-    PLAY_GRID.src = "";
-    show_next_level_overlay();
+//    PLAY_GRID.src = "";
 
     // reset play objects
     PLAY_GRID.src = ASSET_PATH_GRID;
@@ -577,20 +615,48 @@ function go_to_level(lvl) {
     mouseInfo = new Mouse(board);
     objectsInfo = new Objects(board);
     objectsInfo.draw();
-    objectsInfo.initCatsMovement();
+    show_next_level_overlay();
 
     // update game info
-    add_time_to_score();
-    SCORE_LEVEL_START = get_score();
     LEVEL_P.innerHTML = "Level " + (LVL + 1);
 
     // reset timer
     timeRemain = TIME_REMAIN_ALL[LVL] + 1;
-    if (timer != undefined) {
-        clearInterval(timer);
-    }
     update_timer();
+
+    // hold on level start
+    if (levelStartTimeout != undefined) {
+        clearTimeout(levelStartTimeout);
+    }
+    levelStartTimeout = setTimeout(function() {
+        OVERLAY_DIV.innerHTML = '';
+        OVERLAY_DIV.style.padding = '';
+        go_to_level_start();
+    }, 2000);
+}
+
+function go_to_level_start() {
+    // let cats go
+    objectsInfo.initCatsMovement();
+
+    // start timer
     timer = setInterval(update_timer, 1000);
+
+    // reset locks
+    LOCKS["lvlEnd"] = true;
+    LOCKS["lvlStarted"] = true;
+}
+
+function show_level_complete_overlay() {
+    text = '';
+    text += '<h1>Level ' + LVL + ' Complete</h1>';
+    text += '<p>Press L to continue.</p>';
+
+    OVERLAY_DIV.innerHTML = text;
+    OVERLAY_DIV.style.padding = "30px 50px";
+    OVERLAY_DIV.style.top = "100px";
+    OVERLAY_DIV.style.left = "140px";
+    OVERLAY_DIV.style.backgroundColor = "rgba(217, 245, 255, 0.9)";
 }
 
 function show_next_level_overlay() {
@@ -603,11 +669,6 @@ function show_next_level_overlay() {
     OVERLAY_DIV.style.top = "100px";
     OVERLAY_DIV.style.left = "210px";
     OVERLAY_DIV.style.backgroundColor = "rgba(217, 245, 255, 0.9)";
-
-    setTimeout(function() {
-        OVERLAY_DIV.innerHTML = '';
-        OVERLAY_DIV.style.padding = '';
-    }, 2000);
 }
 
 
@@ -813,6 +874,7 @@ function catMoveFuncBasic(n, freePos) {
     else {
         i = getNextCatPosChaseBasic(mousePos, catPos, freePos);
         if (canChangeSpeed) { cat["params"]["speed"] = "fast"; }
+        meow(n, 0.85);
     }
     return freePos[i];
 }
@@ -912,6 +974,7 @@ function catMoveFuncPathFinding(n, tgtPos, freePos, avoidPos=null) {
             }
             cat["params"]["speed"] = "fast";
 //            console.log(fullPath);
+            meow(n, 0.90);
             deAllocateDMask(dMask);
             return node.pos;
         }
@@ -1077,6 +1140,7 @@ function catMoveFuncStrong(n, mousePos, freePos) {
         let i = alignScores.indexOf(Math.max(...alignScores));
         let pos = allPos[i];
         if (objectsInfo.hasEmpty(pos)) { // found free space
+            meow(n, 0.80);
             return pos;
         }
         else if (pos[0] == catPos[0] || pos[1] == catPos[1]) {
@@ -1091,6 +1155,7 @@ function catMoveFuncStrong(n, mousePos, freePos) {
             }
             if (objectsInfo.canPush(pos, dir_)) { // found push option
                 objectsInfo.pushObjects(pos, dir_);
+                meow(n, 0.80);
                 return pos;
             }
         }
@@ -1102,6 +1167,50 @@ function catMoveFuncStrong(n, mousePos, freePos) {
 function setCatMoveStrong(n) {
     let cat = objectsInfo.catInfo[n];
     setCatMoveBasic(n);
+}
+
+
+
+
+/* AUDIO */
+function meow(n, probMeow=0.95) {
+    let cat = objectsInfo.catInfo[n];
+    let catType = cat.type;
+
+    if (meowLock[n] == undefined) { meowLock[n] = false; }
+    if (meowLock[n]) { return; }
+
+    let doMeow = Math.random() > probMeow;
+
+    if (doMeow) {
+        meowLock[n] = true;
+
+        let clips;
+        switch(catType) {
+            case "basic":
+            case "basicFast":
+                clips = ASSET_PATH_CAT_BASIC_AUD;
+                break;
+            case "pathFinding":
+                clips = ASSET_PATH_CAT_PATH_FINDING_AUD;
+                break;
+            case "evasive":
+                clips = ASSET_PATH_CAT_EVASIVE_AUD;
+                break;
+            case "strong":
+                clips = ASSET_PATH_CAT_STRONG_AUD;
+                break;
+        }
+
+        let i = Math.floor(Math.random() * clips.length);
+        let audio = new Audio(clips[i]);
+        audio.volume = 10 ** ((-12 + 9 * Math.random()) / 20);
+        audio.play();
+        setTimeout(function() {
+            meowLock[n] = false;
+        }, 1000 + 1000 * audio.duration);
+        =delete audio;
+    }
 }
 
 
@@ -1134,3 +1243,11 @@ function subVec(x, y) {
 function addVec(x, y) {
     return x.map((e, i) => e + y[i]);
 }
+
+
+/* MISC */
+function sleepLock(lockName, func) {
+    if (!LOCKS[lockName]) { func(); return; }
+    setTimeout(sleepLock, 200, lockName, func)
+}
+

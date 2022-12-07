@@ -2,6 +2,9 @@
 const BLOCK_BIN_MASK = [];
 const TIME_REMAIN_ALL = [];
 
+let L, catNums;
+let BASIC_SPEED = {"speed": "slow"};
+
 const CAT_TYPES = {};
 const CAT_PARAMS = {};
 for (let i = 0; i <= MAX_LVL; i++) {
@@ -9,15 +12,15 @@ for (let i = 0; i <= MAX_LVL; i++) {
     CAT_PARAMS[i] = {};
 }
 
-let L, catNums;
-
-let BASIC_SPEED = {"speed": "slow"};
-
-function addO(obj, n, info) {
+function addCatInfo(obj, n, info) {
     obj[ID_RANGE_CAT[0] + n] = info;
 }
 
-// level 0
+
+
+/* level descriptions (layout, cat info, time) */
+
+// level 1
 L = 0;
 BLOCK_BIN_MASK[L] = [
     "B------------------B",
@@ -28,7 +31,7 @@ BLOCK_BIN_MASK[L] = [
     "--------BBBBB-BB----",
     "-----BBBBBB---------",
     "--M------BBBBB------",
-    "----BBBBBBB-H---A---",
+    "----BBBBBBB-H----A--",
     "------BBBBBBBB------",
     "-----------BBBBB----",
     "---BBBBBBBBBB-------",
@@ -42,12 +45,12 @@ BLOCK_BIN_MASK[L] = [
     "B---------B--------B"
 ];
 
-addO(CAT_TYPES[L], 0, "basic");
-addO(CAT_PARAMS[L], 0, BASIC_SPEED);
+addCatInfo(CAT_TYPES[L], 0, "basic");
+addCatInfo(CAT_PARAMS[L], 0, BASIC_SPEED);
 
 TIME_REMAIN_ALL[L] = 180;
 
-// level 1
+// level 2
 L = 1;
 BLOCK_BIN_MASK[L] = [
     "----BB--------------",
@@ -73,12 +76,12 @@ BLOCK_BIN_MASK[L] = [
 ];
 
 catNums = [0, 1, 2];
-catNums.forEach(n => addO(CAT_TYPES[L], n, "basic"));
-catNums.forEach(n => addO(CAT_PARAMS[L], n, BASIC_SPEED));
+catNums.forEach(n => addCatInfo(CAT_TYPES[L], n, "basic"));
+catNums.forEach(n => addCatInfo(CAT_PARAMS[L], n, BASIC_SPEED));
 
 TIME_REMAIN_ALL[L] = 180;
 
-// level 2
+// level 3
 L = 2;
 BLOCK_BIN_MASK[L] = [
     "--------------------",
@@ -104,19 +107,19 @@ BLOCK_BIN_MASK[L] = [
 ]
 
 catNums = [0, 1, 2];
-catNums.forEach(n => addO(CAT_TYPES[L], n, "basicFast"));
-catNums.forEach(n => addO(CAT_PARAMS[L], n, BASIC_SPEED));
+catNums.forEach(n => addCatInfo(CAT_TYPES[L], n, "basicFast"));
+catNums.forEach(n => addCatInfo(CAT_PARAMS[L], n, BASIC_SPEED));
 catNums = [3, 4];
-catNums.forEach(n => addO(CAT_TYPES[L], n, "basic"));
-catNums.forEach(n => addO(CAT_PARAMS[L], n, BASIC_SPEED));
+catNums.forEach(n => addCatInfo(CAT_TYPES[L], n, "basic"));
+catNums.forEach(n => addCatInfo(CAT_PARAMS[L], n, BASIC_SPEED));
 
 TIME_REMAIN_ALL[L] = 240;
 
-// level 3
+// level 4
 L = 3;
 BLOCK_BIN_MASK[L] = [
     "FFFFFF--FFFFFFFF----",
-    "-H-------------A--H-",
+    "-H-A-----------A--H-",
     "BBBFFFFFBB--BBFFFFBB",
     "--------------------",
     "FFF--BBBBBBBBBBBBBBB",
@@ -137,12 +140,13 @@ BLOCK_BIN_MASK[L] = [
     "M-------------------"
 ]
 
-addO(CAT_TYPES[L], 0, "pathFinding");
-addO(CAT_PARAMS[L], 0, BASIC_SPEED);
+catNums = [0, 1];
+catNums.forEach(i => addCatInfo(CAT_TYPES[L], i, "pathFinding"));
+catNums.forEach(i => addCatInfo(CAT_PARAMS[L], i, BASIC_SPEED));
 
 TIME_REMAIN_ALL[L] = 120;
 
-// level 4
+// level 5
 L = 4;
 BLOCK_BIN_MASK[L] = [
     "--------BBF---------",
@@ -168,13 +172,13 @@ BLOCK_BIN_MASK[L] = [
 ]
 
 catNums = [0, 1, 2, 3];
-catNums.forEach(i => addO(CAT_TYPES[L], i, "pathFinding"));
-catNums.forEach(i => addO(CAT_PARAMS[L], i, BASIC_SPEED));
+catNums.forEach(i => addCatInfo(CAT_TYPES[L], i, "pathFinding"));
+catNums.forEach(i => addCatInfo(CAT_PARAMS[L], i, BASIC_SPEED));
 
 TIME_REMAIN_ALL[L] = 180;
 
 
-// level 5
+// level 6
 L = 5;
 BLOCK_BIN_MASK[L] = [
     "--BB------------BB--",
@@ -200,13 +204,13 @@ BLOCK_BIN_MASK[L] = [
 ]
 
 catNums = [0, 1, 2, 3];
-catNums.forEach(i => addO(CAT_TYPES[L], i, "evasive"));
-catNums.forEach(i => addO(CAT_PARAMS[L], i, BASIC_SPEED));
+catNums.forEach(i => addCatInfo(CAT_TYPES[L], i, "evasive"));
+catNums.forEach(i => addCatInfo(CAT_PARAMS[L], i, BASIC_SPEED));
 
 TIME_REMAIN_ALL[L] = 180;
 
 
-// level 6
+// level 7
 L = 6;
 BLOCK_BIN_MASK[L] = [
     "----F-----B----B-B--",
@@ -232,16 +236,16 @@ BLOCK_BIN_MASK[L] = [
 ]
 
 catNums = [0, 1];
-catNums.forEach(i => addO(CAT_TYPES[L], i, "evasive"));
-catNums.forEach(i => addO(CAT_PARAMS[L], i, BASIC_SPEED));
+catNums.forEach(i => addCatInfo(CAT_TYPES[L], i, "evasive"));
+catNums.forEach(i => addCatInfo(CAT_PARAMS[L], i, BASIC_SPEED));
 
 catNums = [2, 3];
-catNums.forEach(i => addO(CAT_TYPES[L], i, "pathFinding"));
-catNums.forEach(i => addO(CAT_PARAMS[L], i, BASIC_SPEED));
+catNums.forEach(i => addCatInfo(CAT_TYPES[L], i, "pathFinding"));
+catNums.forEach(i => addCatInfo(CAT_PARAMS[L], i, BASIC_SPEED));
 
 TIME_REMAIN_ALL[L] = 300;
 
-// level 7
+// level 8
 L = 7;
 BLOCK_BIN_MASK[L] = [
     "----AA------AA------",
@@ -267,16 +271,16 @@ BLOCK_BIN_MASK[L] = [
 ]
 
 catNums = [0, 1, 2, 3, 4, 5];
-catNums.forEach(i => addO(CAT_TYPES[L], i, "evasive"));
-catNums.forEach(i => addO(CAT_PARAMS[L], i, BASIC_SPEED));
+catNums.forEach(i => addCatInfo(CAT_TYPES[L], i, "evasive"));
+catNums.forEach(i => addCatInfo(CAT_PARAMS[L], i, BASIC_SPEED));
 
 catNums = [6, 7];
-catNums.forEach(i => addO(CAT_TYPES[L], i, "pathFinding"));
-catNums.forEach(i => addO(CAT_PARAMS[L], i, BASIC_SPEED));
+catNums.forEach(i => addCatInfo(CAT_TYPES[L], i, "pathFinding"));
+catNums.forEach(i => addCatInfo(CAT_PARAMS[L], i, BASIC_SPEED));
 
 TIME_REMAIN_ALL[L] = 120;
 
-// level 8
+// level 9
 L = 8;
 BLOCK_BIN_MASK[L] = [
     "FFFFFFFFFFFFFFFFFFFF",
@@ -304,38 +308,33 @@ BLOCK_BIN_MASK[L] = [
 TIME_REMAIN_ALL[L] = 120;
 
 catNums = [0, 1, 2, 3];
-catNums.forEach(i => addO(CAT_TYPES[L], i, "strong"));
-catNums.forEach(i => addO(CAT_PARAMS[L], i, BASIC_SPEED));
+catNums.forEach(i => addCatInfo(CAT_TYPES[L], i, "strong"));
+catNums.forEach(i => addCatInfo(CAT_PARAMS[L], i, BASIC_SPEED));
 
-
-
-
-
-
-//// level 8
-//L = 8;
-//BLOCK_BIN_MASK[L] = [
-//    "--------------------",
-//    "--------------------",
-//    "--------------------",
-//    "--------------------",
-//    "--------------------",
-//    "--------------------",
-//    "--------------------",
-//    "--------------------",
-//    "--------------------",
-//    "--------------------",
-//    "--------------------",
-//    "--------------------",
-//    "--------------------",
-//    "--------------------",
-//    "--------------------",
-//    "--------------------",
-//    "--------------------",
-//    "--------------------",
-//    "--------------------",
-//    "--------------------"
-//];
+// level 10
+L = 9
+BLOCK_BIN_MASK[L] = [
+    "--------------------",
+    "--------------------",
+    "--------------------",
+    "--------------------",
+    "--------------------",
+    "--------------------",
+    "--------------------",
+    "--------------------",
+    "--------------------",
+    "--------------------",
+    "--------------------",
+    "--------------------",
+    "--------------------",
+    "--------------------",
+    "--------------------",
+    "--------------------",
+    "--------------------",
+    "--------------------",
+    "--------------------",
+    "--------------------"
+];
 
 
 
