@@ -1,16 +1,12 @@
 /* Main functionality for mouse game */
+
 /*
-TODO: more cats
-TODO:   jumping cats (can leap over a single block)
-TODO:   cat den (spawns new cats, destroyed with a bomb)
+TODO:   cat den (spawns new cats)
 
-TODO: 10 levels
-TODO: better styling (centered elements, nice-looking buttons and stats)
-
-TODO: cat fortress on levels 5, 10, and 15
-TODO:   many fixed blocks and cat den
-TODO:   must pick up bomb and destroy cat den
-TODO:   get power-up after each one
+TODO: better styling
+        centered elements
+        nice-looking buttons and stats
+        set top panel relative to game grid
 */
 
 
@@ -150,6 +146,7 @@ class Objects {
 
         // init cat info
         this.catInfo = {}; // pos, type, params
+        this.catsMoving = false;
 
         // init block mask
         this.objMask = [];
@@ -265,8 +262,13 @@ class Objects {
             }
         }
     }
-    initCatsMovement() {
+    startCatsMovement() {
+        this.catsMoving = true;
         Object.keys(this.catInfo).forEach(n => catMoveFunc(n));
+    }
+    stopCatsMovement() {
+        this.catsMoving = false;
+        Object.keys(this.catInfo).forEach(n => clearCatMove(n));
     }
 
     // status check methods
@@ -415,7 +417,6 @@ class Objects {
         // if cat, update its pos array
         if (isCat(n)) {
             this.catInfo[n]["pos"] = [i_end, j_end];
-//            this.catPos[n] = [i_end, j_end];
         }
     }
     remove(pos) {
@@ -425,7 +426,6 @@ class Objects {
     turnCatIntoCheese(n) {
         // get info
         let elem = document.getElementById("object" + n.toString());
-//        let pos = this.catPos[n];
         let pos = this.catInfo[n]["pos"];
         let n_new = this.n_cheese;
         this.n_cheese += 1;
@@ -440,7 +440,6 @@ class Objects {
 
         // remove cat pos
         delete this.catInfo[n];
-//        delete this.catPos[n];
     }
 }
 
@@ -461,26 +460,30 @@ document.onkeypress = function(e) {
         case "a":
             mouseInfo.move("left");
             break;
-        case "=":
+        case "=": // go up a level
             timeRemain = 0;
             LOCKS["lvlEnd"] = false;
+            update_score(null, SCORE_LEVEL_START);
             go_to_level(Math.min(MAX_LVL, LVL + 1));
             break;
-        case "-":
+        case "-": // go down a level
             timeRemain = 0;
             LOCKS["lvlEnd"] = false;
+            update_score(null, SCORE_LEVEL_START);
             go_to_level(Math.max(0, LVL - 1));
             break;
-        case "r":
+        case "r": //  restart current level
             timeRemain = 0;
             update_score(null, SCORE_LEVEL_START);
             LOCKS["lvlEnd"] = false;
             go_to_level(LVL);
             break;
-        case "l":
-            if (LOCKS["lvlEnd"]) {
-                LOCKS["lvlEnd"] = false;
-            }
+        case "l": // release level end lock
+            if (LOCKS["lvlEnd"]) { LOCKS["lvlEnd"] = false; }
+            break;
+        case "p": // toggle cats freeze
+            if (objectsInfo.catsMoving) { objectsInfo.stopCatsMovement();  }
+            else                        { objectsInfo.startCatsMovement(); }
             break;
     }
 }
@@ -637,7 +640,7 @@ function go_to_level_finish() {
 
 function go_to_level_start() {
     // let cats go
-    objectsInfo.initCatsMovement();
+    objectsInfo.startCatsMovement();
 
     // start timer
     timer = setInterval(update_timer, 1000);
@@ -820,7 +823,6 @@ function clearCatMove(n=null) {
     }
     else {
         clearInterval(catMove[n]);
-        delete catMove[n];
     }
 }
 
@@ -913,7 +915,6 @@ function getNextCatPosChaseBasic(mousePos, catPos, freePos, mode="chase") {
     let maxVal = -2;
     for (const [n, vec] of freePos.entries()) {
         val = innerProdNormalized(subVec(vec, catPos), dirVec);
-//        val = innerProdNormalized([vec[0] - catPos[0], vec[1] - catPos[1]], dirVec);
         if (val > maxVal) {
             maxVal = val;
             i = n;
@@ -965,12 +966,11 @@ function catMoveFuncPathFinding(n, tgtPos, freePos, avoidPos=null) {
 
         // check for mouse and backtrack, otherwise expand
         if (tgtPos[0] == i && tgtPos[1] == j) {
-            let fullPath = [[i, j]];
+//            let fullPath = [[i, j]];
             node = dMask[i][j];
-//            console.log(node.cost);
             while (node.parent.parent != null) {
                 node = node.parent;
-                fullPath.push(node.pos);
+//                fullPath.push(node.pos);
             }
             cat["params"]["speed"] = "fast";
 //            console.log(fullPath);
@@ -1177,7 +1177,7 @@ function meow(n, probMeow=0.95) {
     let cat = objectsInfo.catInfo[n];
     let catType = cat.type;
 
-    if (meowLock[n] == undefined) { meowLock[n] = false; }
+    if (!(n in meowLock)) { meowLock[n] = false; }
     if (meowLock[n]) { return; }
 
     let doMeow = Math.random() > probMeow;
@@ -1209,40 +1209,11 @@ function meow(n, probMeow=0.95) {
         setTimeout(function() {
             meowLock[n] = false;
         }, 1000 + 1000 * audio.duration);
-        =delete audio;
+        delete audio;
     }
 }
 
 
-
-
-/* MATH, GEOMETRY */
-function distEuclidean(x, y) {
-    if (x.length != y.length) {
-        return Math.NaN;
-    }
-    let dist = 0;
-    for (let n = 0; n < x.length; n++) {
-        dist += (x[n] - y[n]) ** 2;
-    }
-    return Math.sqrt(dist);
-}
-
-function innerProdNormalized(x, y) {
-    return (x[0] * y[0] + x[1] * y[1]) / (L2Norm(x) * L2Norm(y))
-}
-
-function L2Norm(x) {
-    return Math.sqrt(x.reduce((sum, x) => sum + x ** 2, 0))
-}
-
-function subVec(x, y) {
-    return x.map((e, i) => e - y[i]);
-}
-
-function addVec(x, y) {
-    return x.map((e, i) => e + y[i]);
-}
 
 
 /* MISC */
