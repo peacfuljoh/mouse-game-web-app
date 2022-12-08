@@ -1,15 +1,5 @@
 /* Main functionality for mouse game */
 
-/*
-TODO:   cat den (spawns new cats)
-
-TODO: better styling
-        centered elements
-        nice-looking buttons and stats
-        set top panel relative to game grid
-*/
-
-
 // elements
 const MOUSE_ICON = document.getElementById('mouse-icon');
 const OBJECTS_DIV = document.getElementById('objects-div');
@@ -17,24 +7,22 @@ const PLAY_GRID = document.getElementById('play-grid');
 const OVERLAY_DIV = document.getElementById('overlay');
 const LEVEL_P = document.getElementById('level');
 
-// state objects
-let LVL = 0;
-let mouseInfo;
-let objectsInfo;
-let timeRemain = 0;
-let timer;
+// game state
+let mouseInfo, objectsInfo;
+let timerClock, timeRemain;
+let LVL; // current level
 let trapped = setInterval(isMouseDead, 10);
-let catMove = {};
+let catMove = {}; // intervals for cat movement
+let denSpawn = {}; // intervals for den spawn activity
 let GAME_OVER = true;
-
 let LOCKS = {lvlEnd: false, lvlStarted: false};
-let levelTransitionTimer; //
-let levelStartTimeout;
+let levelStartTimeout; // ensures fresh new-level overlay on level change
 
 let HIGH_SCORE = 0;
-let SCORE_LEVEL_START = 0;
+let levelScores = {};
+let currentLevelScore = 0;
 
-let meowLock = {};
+let meowLock = {}; // ensures a single cat's meows can't pile up
 
 
 
@@ -143,10 +131,13 @@ class Objects {
         this.n_cheese = ID_RANGE_CHEESE[0]; // 401 through 450
         this.n_cat = ID_RANGE_CAT[0]; // 451 through 500
         this.n_block_fixed = ID_RANGE_BLOCK_FIXED[0]; // 501 through 900
+        this.n_den = ID_RANGE_DEN[0]; // 901 through 1000
 
         // init cat info
         this.catInfo = {}; // pos, type, params
-        this.catsMoving = false;
+        this.catsActive = false;
+        this.denInfo = {}; // pos, type, params
+        this.denActive = false;
 
         // init block mask
         this.objMask = [];
@@ -157,32 +148,53 @@ class Objects {
         for (let i = 0; i < GRIDSIZE[0]; i++) {
             this.objMask.push([]);
             for (let j = 0; j < GRIDSIZE[1]; j++) {
-                if (lvl_layout[i][j] == SYMBOL_BLOCK) {
-                    this.objMask[i].push(this.n_block);
-                    this.n_block += 1;
-                }
-                else if (lvl_layout[i][j] == SYMBOL_BLOCK_FIXED) {
-                    this.objMask[i].push(this.n_block_fixed);
-                    this.n_block_fixed += 1;
-                }
-                else if (lvl_layout[i][j] == SYMBOL_CHEESE) {
-                    this.objMask[i].push(this.n_cheese);
-                    this.n_cheese += 1;
-                }
-                else if (lvl_layout[i][j] == SYMBOL_CAT) {
-                    this.objMask[i].push(this.n_cat);
-                    this.catInfo[this.n_cat] = {
-                        "pos": [i, j],
-                        "type": CAT_TYPES[LVL][this.n_cat],
-                        "params": CAT_PARAMS[LVL][this.n_cat]
-                    };
-                    this.n_cat += 1;
-                }
-                else {
-                    this.objMask[i].push(n_empty);
+                switch(lvl_layout[i][j]) {
+                    case SYMBOL_BLOCK: {
+                        this.objMask[i].push(this.n_block);
+                        this.n_block += 1;
+                        break;
+                    }
+                    case SYMBOL_BLOCK_FIXED: {
+                        this.objMask[i].push(this.n_block_fixed);
+                        this.n_block_fixed += 1;
+                        break;
+                    }
+                    case SYMBOL_CHEESE: {
+                        this.objMask[i].push(this.n_cheese);
+                        this.n_cheese += 1;
+                        break;
+                    }
+                    case SYMBOL_CAT: {
+                        this.objMask[i].push(null);
+                        this.addCat([i, j], CAT_TYPES[LVL][this.n_cat], CAT_PARAMS[LVL][this.n_cat]);
+                        break;
+                    }
+                    case SYMBOL_DEN: {
+                        this.objMask[i].push(this.n_den);
+                        this.denInfo[this.n_den] = {
+                            "pos": [i, j],
+                            "type": DEN_TYPES[LVL][this.n_den],
+                            "params": DEN_PARAMS[LVL][this.n_den]
+                        };
+                        this.n_den += 1;
+                        break;
+                    }
+                    default: {
+                        this.objMask[i].push(n_empty);
+                    }
                 }
             }
         }
+    }
+    addCat(pos, catType, catParams) {
+        this.objMask[pos[0]][pos[1]] = this.n_cat;
+        this.catInfo[this.n_cat] = {
+            "pos": pos,
+            "type": catType,
+            "params": catParams
+        };
+        this.n_cat += 1;
+        return this.n_cat - 1; // index of cat just created
     }
     draw() {
         let n;
@@ -191,13 +203,18 @@ class Objects {
             for (let j = 0; j < GRIDSIZE[1]; j++) {
                 n = this.objMask[i][j];
                 if (n != 0) {
-                    text += this.addObjectText(i, j, getObjectTypeFromId(n), getCatType(n));
+                    text += this.addObjectText(i, j, getObjectTypeFromId(n),
+                        getCatType(n), getDenType(n));
                 }
             }
         }
         OBJECTS_DIV.innerHTML = text;
     }
-    addObjectText(i, j, type, catType) {
+    drawNewCat(n) {
+        let [i, j] = this.catInfo[n].pos;
+        OBJECTS_DIV.innerHTML += this.addObjectText(i, j, getObjectTypeFromId(n), getCatType(n), getDenType(n));
+    }
+    addObjectText(i, j, type, catType, denType) {
         let top = BLOCK_PX_TOP0 + i * BLOCK_PX_PER_CELL;
         let left = BLOCK_PX_LEFT0 + j * BLOCK_PX_PER_CELL;
         if (type == "cheese") { top += 2; }
@@ -205,7 +222,7 @@ class Objects {
 
         let text = '';
         text += '<img id="object' + n.toString() + '" src=';
-        text += '"' + this.getObjectAssetPath(type, catType) + '"';
+        text += '"' + this.getObjectAssetPath(type, catType, denType) + '"';
         text += ' style="';
         text += ' top:' + top.toString() + 'px;';
         text += ' left:' + left.toString() + 'px;';
@@ -219,7 +236,7 @@ class Objects {
 
         return text;
     }
-    getObjectAssetPath(type, catType) {
+    getObjectAssetPath(type, catType, denType) {
         switch(type) {
             case "block":
                 return ASSET_PATH_BLOCK;
@@ -240,6 +257,9 @@ class Objects {
                         return ASSET_PATH_CAT_STRONG;
                 }
             }
+            case "den": {
+                return ASSET_PATH_DEN;
+            }
         }
     }
     getObjectTextHeight(type, catType) {
@@ -249,27 +269,25 @@ class Objects {
                 return '26px';
             case "cheese":
                 return '18px';
+            case "den":
             case "cat": {
                 return '24px';
-//                switch(catType) {
-//                    case "basic":
-//                    case "basicFast":
-//                    case 'pathFinding':
-//                    case "evasive":
-//                    case "strong":
-//                        return '24px';
-//                }
             }
         }
     }
-    startCatsMovement() {
-        this.catsMoving = true;
+    startActivity() {
+        this.catsActive = true;
+        this.densActive = true;
         Object.keys(this.catInfo).forEach(n => catMoveFunc(n));
+        Object.keys(this.denInfo).forEach(n => setDenSpawn(n));
     }
-    stopCatsMovement() {
-        this.catsMoving = false;
+    stopActivity() {
+        this.catsActive = false;
+        this.densActive = false;
         Object.keys(this.catInfo).forEach(n => clearCatMove(n));
+        Object.keys(this.denInfo).forEach(n => clearDenSpawn(n));
     }
+    
 
     // status check methods
     hasEmpty(pos) {
@@ -382,9 +400,7 @@ class Objects {
 
         // search for the furthest-away block in the stack
         do {
-            if (this.hasEmpty([i, j]) || this.hasCheese([i, j])) {
-                break;
-            }
+            if (this.hasEmpty([i, j]) || this.hasCheese([i, j])) { break; }
             increment(0);
         } while (i >= 0 && i <= GRIDSIZE[0] - 1 && j >= 0 && j <= GRIDSIZE[1] - 1);
 
@@ -415,9 +431,7 @@ class Objects {
         this.objMask[i_start][j_start] = 0;
 
         // if cat, update its pos array
-        if (isCat(n)) {
-            this.catInfo[n]["pos"] = [i_end, j_end];
-        }
+        if (isCat(n)) { this.catInfo[n]["pos"] = [i_end, j_end]; }
     }
     remove(pos) {
         this.objMask[pos[0]][pos[1]] = 0;
@@ -448,33 +462,25 @@ class Objects {
 /* USER INPUT */
 document.onkeypress = function(e) {
     switch (e.key) {
-        case "w":
-            mouseInfo.move("up");
-            break;
-        case "d":
-            mouseInfo.move("right");
-            break;
-        case "s":
-            mouseInfo.move("down");
-            break;
-        case "a":
-            mouseInfo.move("left");
-            break;
+        case "w": mouseInfo.move("up"); break;
+        case "d": mouseInfo.move("right"); break;
+        case "s": mouseInfo.move("down"); break;
+        case "a": mouseInfo.move("left"); break;
         case "=": // go up a level
             timeRemain = 0;
+            currentLevelScore = 0;
             LOCKS["lvlEnd"] = false;
-            update_score(null, SCORE_LEVEL_START);
             go_to_level(Math.min(MAX_LVL, LVL + 1));
             break;
         case "-": // go down a level
             timeRemain = 0;
+            currentLevelScore = 0;
             LOCKS["lvlEnd"] = false;
-            update_score(null, SCORE_LEVEL_START);
             go_to_level(Math.max(0, LVL - 1));
             break;
         case "r": //  restart current level
             timeRemain = 0;
-            update_score(null, SCORE_LEVEL_START);
+            currentLevelScore = 0;
             LOCKS["lvlEnd"] = false;
             go_to_level(LVL);
             break;
@@ -482,8 +488,8 @@ document.onkeypress = function(e) {
             if (LOCKS["lvlEnd"]) { LOCKS["lvlEnd"] = false; }
             break;
         case "p": // toggle cats freeze
-            if (objectsInfo.catsMoving) { objectsInfo.stopCatsMovement();  }
-            else                        { objectsInfo.startCatsMovement(); }
+            if (objectsInfo.catsActive) { objectsInfo.stopActivity();  }
+            else                        { objectsInfo.startActivity(); }
             break;
     }
 }
@@ -493,9 +499,10 @@ document.onkeypress = function(e) {
 
 /* GAME OVER, NEW GAME, LEVEL CHANGE */
 function new_game() {
-    GAME_OVER = false;
     reset_overlay();
     timeRemain = 0;
+    currentLevelScore = 0;
+    resetLevelScores();
     update_score();
     LOCKS["lvlEnd"] = false;
     go_to_level(INIT_LVL);
@@ -506,11 +513,17 @@ function reset_overlay() {
     OVERLAY_DIV.style.padding = "";
 }
 
+function resetLevelScores() {
+    for (let i = 0; i <= MAX_LVL; i++) {
+        levelScores[i] = 0;
+    }
+}
+
 function game_over(outcome) { // "eaten", "time", "win", "crush"
     GAME_OVER = true;
 
     // stop timer
-    clearInterval(timer);
+    clearInterval(timerClock);
 
     // update mouse info
     if (outcome != "win") {
@@ -520,7 +533,8 @@ function game_over(outcome) { // "eaten", "time", "win", "crush"
     }
 
     // save high score
-    HIGH_SCORE = Math.max(HIGH_SCORE, get_score());
+    currentLevelScore = 0;
+    HIGH_SCORE = Math.max(HIGH_SCORE, getScore());
 
     // show overlay
     show_game_over_overlay(outcome)
@@ -543,7 +557,7 @@ function show_game_over_overlay(outcome) {
 function game_over_text(outcome) {
     centerStyle = 'text-align:center; ';
 
-    let score_ = get_score();
+    let score_ = getScore();
     let scoreColorStyle = '';
     if (score_ == HIGH_SCORE) { scoreColorStyle = "color:green; " }
 
@@ -568,6 +582,8 @@ function game_over_text(outcome) {
 }
 
 function go_to_level(lvl) {
+    GAME_OVER = false;
+
     // set level not started flag
     LOCKS["lvlStarted"] = false;
 
@@ -576,10 +592,10 @@ function go_to_level(lvl) {
 
     // update score
     add_time_to_score();
-    SCORE_LEVEL_START = get_score();
+    if (LVL != undefined) { levelScores[LVL] = Math.max(levelScores[LVL], currentLevelScore); }
+    update_score();
 
     // determine level
-    console.log('a: ' + LVL);
     if (lvl <= MAX_LVL) { // next level
         LVL = lvl;
     }
@@ -589,24 +605,17 @@ function go_to_level(lvl) {
     }
 
     // freeze timer
-    if (timer != undefined) {
-        clearInterval(timer);
-    }
-
-    console.log('a2: ' + LVL);
+    if (timerClock != undefined) { clearInterval(timerClock); }
 
     // hold on level end
     if (LOCKS["lvlEnd"]) {
         show_level_complete_overlay();
-        sleepLock("lvlEnd", go_to_level_finish);
+        sleepLock(LOCKS, "lvlEnd", go_to_level_finish);
     }
-    else {
-        go_to_level_finish();
-    }
+    else { go_to_level_finish(); }
 }
 
 function go_to_level_finish() {
-    console.log('b: ' + LVL);
     // continue level refresh
     delete mouseInfo;
     delete objectsInfo;
@@ -627,10 +636,12 @@ function go_to_level_finish() {
     timeRemain = TIME_REMAIN_ALL[LVL] + 1;
     update_timer();
 
+    // update score
+    currentLevelScore = 0;
+    update_score();
+
     // hold on level start
-    if (levelStartTimeout != undefined) {
-        clearTimeout(levelStartTimeout);
-    }
+    if (levelStartTimeout != undefined) { clearTimeout(levelStartTimeout); }
     levelStartTimeout = setTimeout(function() {
         OVERLAY_DIV.innerHTML = '';
         OVERLAY_DIV.style.padding = '';
@@ -640,10 +651,13 @@ function go_to_level_finish() {
 
 function go_to_level_start() {
     // let cats go
-    objectsInfo.startCatsMovement();
+    objectsInfo.startActivity();
 
     // start timer
-    timer = setInterval(update_timer, 1000);
+    timerClock = setInterval(update_timer, 1000);
+
+    // reset level score
+    currentLevelScore = 0;
 
     // reset locks
     LOCKS["lvlEnd"] = true;
@@ -708,25 +722,24 @@ function add_time_to_score() {
     update_score(Math.floor(timeRemain * timeToScoreFactor));
 }
 
-function update_score(incr=null, newVal=null) {
-    let elem = document.getElementById("score");
-    if      (incr == null && newVal == null) { elem.innerHTML = "Score: 0"; }
-    else if (incr != null)                    { elem.innerHTML = "Score: " + (get_score() + incr); }
-    else                                      { elem.innerHTML = "Score: " + newVal; }
+function update_score(incr=0) {
+    currentLevelScore += incr;
+    document.getElementById("score").innerHTML =
+        "Score: " + getScore() + ' (' + currentLevelScore + '/' +
+        ((LVL != undefined) ? levelScores[LVL] : 0) + ')';
 }
 
-function get_score() {
-    let elem = document.getElementById("score");
-    return Number(elem.innerHTML.substring(7));
+function getScore() {
+    if (LVL == undefined) { return 0; }
+    return Object.entries(levelScores).reduce((tot, p) =>
+        (p[0] == LVL) ? tot + Math.max(currentLevelScore, p[1]) : tot + p[1], 0);
 }
 
 
 
 /* PLAY AREA STATUS */
 function isMouseDead() {
-    if (objectsInfo == undefined || mouseInfo == undefined) {
-        return;
-    }
+    if (objectsInfo == undefined || mouseInfo == undefined) { return; }
 
     // check if mouse is crushed under a block
     if (mouseInfo.isAlive && objectsInfo.hasBlock(mouseInfo.pos)) {
@@ -767,16 +780,26 @@ function isEdible(n) {
     return isCheese(n) || isCat(n);
 }
 
+function isDen(n) {
+    return n >= ID_RANGE_DEN[0] && n <= ID_RANGE_DEN[1];
+}
+
 function getObjectTypeFromId(n) {
     if (isBlock(n))      { return "block";  }
     if (isCheese(n))     { return "cheese"; }
     if (isCat(n))        { return "cat";    }
     if (isFixedBlock(n)) { return "blockFixed"; }
+    if (isDen(n))        { return "den"; }
     return "";
 }
 
 function getCatType(n) {
     if (isCat(n)) { return objectsInfo.catInfo[n].type; }
+    return null;
+}
+
+function getDenType(n) {
+    if (isDen(n)) { return objectsInfo.denInfo[n].type; }
     return null;
 }
 
@@ -818,12 +841,7 @@ function processCatToCheese(n) {
 }
 
 function clearCatMove(n=null) {
-    if (n == null) {
-        Object.keys(catMove).forEach(n => clearCatMove(n));
-    }
-    else {
-        clearInterval(catMove[n]);
-    }
+    (n == null) ? Object.keys(catMove).forEach(n => clearCatMove(n)) : clearInterval(catMove[n]);
 }
 
 
@@ -856,9 +874,7 @@ function catMoveFuncGeneral(n) {
         if (newPos) { objectsInfo.move(catPos[0], catPos[1], newPos[0], newPos[1]); }
         return true;
     }
-    else { // cat is trapped, turns into cheese
-        processCatToCheese(n);
-    }
+    else { processCatToCheese(n); } // cat is trapped, turns into cheese
     return false;
 }
 
@@ -882,9 +898,7 @@ function catMoveFuncBasic(n, freePos) {
 }
 
 function setCatMoveBasic(n) {
-    if (n in catMove) {
-        clearInterval(catMove[n]);
-    }
+    if (n in catMove) { clearInterval(catMove[n]); }
     let cat = objectsInfo.catInfo[n];
     let speed = cat["params"]["speed"]
     switch(speed) {
@@ -966,14 +980,11 @@ function catMoveFuncPathFinding(n, tgtPos, freePos, avoidPos=null) {
 
         // check for mouse and backtrack, otherwise expand
         if (tgtPos[0] == i && tgtPos[1] == j) {
-//            let fullPath = [[i, j]];
             node = dMask[i][j];
             while (node.parent.parent != null) {
                 node = node.parent;
-//                fullPath.push(node.pos);
             }
             cat["params"]["speed"] = "fast";
-//            console.log(fullPath);
             meow(n, 0.90);
             deAllocateDMask(dMask);
             return node.pos;
@@ -1050,9 +1061,7 @@ function catMoveFuncEvasive(n, tgtPos, freePos) {
     let catPos = cat.pos;
 
     // if far from mouse, move randomly
-    if (distEuclidean(catPos, tgtPos) > DETECT_RADIUS) {
-        return catMoveFuncBasic(n, freePos);
-    }
+    if (distEuclidean(catPos, tgtPos) > DETECT_RADIUS) { return catMoveFuncBasic(n, freePos); }
 
     // init free space mask (0 = occupied, 1 = free)
     const dMask = objectsInfo.objMask.map(function f_row(row) {
@@ -1060,9 +1069,7 @@ function catMoveFuncEvasive(n, tgtPos, freePos) {
             return Number(val == 0);
         });
     });
-    if (!GAME_OVER) {
-        dMask[tgtPos[0]][tgtPos[1]] = 0; // avoid mouse
-    }
+    if (!GAME_OVER) { dMask[tgtPos[0]][tgtPos[1]] = 0; } // avoid mouse
 
     // find all reachable cells
     let reachableCells = [];
@@ -1165,8 +1172,49 @@ function catMoveFuncStrong(n, mousePos, freePos) {
 }
 
 function setCatMoveStrong(n) {
-    let cat = objectsInfo.catInfo[n];
     setCatMoveBasic(n);
+}
+
+
+
+
+/* DEN SPAWN */
+function denSpawnFunc(n_den) {
+    clearDenSpawn(n_den);
+
+    if (objectsInfo.n_cat == ID_RANGE_CAT[1]) { return; }
+
+    let den = objectsInfo.denInfo[n_den];
+
+    let freePos = objectsInfo.freeCellsAround(den.pos);
+    if (freePos.length) {
+        let pos = freePos[Math.floor(Math.random() * freePos.length)];
+        let n_cat = objectsInfo.addCat(pos, den.type, {speed: "slow"});
+        objectsInfo.drawNewCat(n_cat);
+        catMoveFunc(n_cat);
+    }
+
+    setDenSpawn(n_den);
+}
+
+function clearDenSpawn(n=null) {
+    (n == null) ? Object.keys(denSpawn).forEach(n => clearDenSpawn(n)) : clearInterval(denSpawn[n]);
+}
+
+function setDenSpawn(n) {
+    if (n in denSpawn) { clearDenSpawn(n); }
+
+    let den = objectsInfo.denInfo[n];
+    let params = den.params;
+
+    let dur;
+    switch(params.speed) {
+        case "slow": dur = 15000 + Math.random() * 10000; break;
+        case "fast": dur = 8000 + Math.random() * 4000; break;
+        default: return;
+    }
+
+    denSpawn[n] = setInterval(denSpawnFunc, dur, n);
 }
 
 
@@ -1204,21 +1252,16 @@ function meow(n, probMeow=0.95) {
 
         let i = Math.floor(Math.random() * clips.length);
         let audio = new Audio(clips[i]);
-        audio.volume = 10 ** ((-12 + 9 * Math.random()) / 20);
+        audio.volume = getMeowVolume(cat.pos);
         audio.play();
-        setTimeout(function() {
-            meowLock[n] = false;
-        }, 1000 + 1000 * audio.duration);
+        setTimeout(function() { meowLock[n] = false; }, 1000 + 1000 * audio.duration);
         delete audio;
     }
 }
 
-
-
-
-/* MISC */
-function sleepLock(lockName, func) {
-    if (!LOCKS[lockName]) { func(); return; }
-    setTimeout(sleepLock, 200, lockName, func)
+function getMeowVolume(catPos) {
+    let dist = distEuclidean(mouseInfo.pos, catPos);
+    let vol = 0;
+    if   (dist < DETECT_RADIUS_SMALL) { return 1.0; }
+    else                              { return 10 ** ((-3 - 1.5 * (dist - DETECT_RADIUS_SMALL)) / 20); }
 }
-

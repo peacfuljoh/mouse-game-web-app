@@ -27,3 +27,11 @@ function subVec(x, y) {
 function addVec(x, y) {
     return x.map((e, i) => e + y[i]);
 }
+
+
+
+/* SLEEP */
+function sleepLock(locksObj, lockName, func, dur=200) {
+    if (!locksObj[lockName]) { func(); return; }
+    setTimeout(sleepLock, dur, locksObj, lockName, func, dur)
+}

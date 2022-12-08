@@ -11,9 +11,18 @@ for (let i = 0; i <= MAX_LVL; i++) {
     CAT_TYPES[i] = {};
     CAT_PARAMS[i] = {};
 }
+const DEN_TYPES = {};
+const DEN_PARAMS = {};
+for (let i = 0; i <= MAX_LVL; i++) {
+    DEN_TYPES[i] = {};
+    DEN_PARAMS[i] = {};
+}
 
 function addCatInfo(obj, n, info) {
     obj[ID_RANGE_CAT[0] + n] = info;
+}
+function addDenInfo(obj, n, info) {
+    obj[ID_RANGE_DEN[0] + n] = info;
 }
 
 
@@ -314,29 +323,44 @@ catNums.forEach(i => addCatInfo(CAT_PARAMS[L], i, BASIC_SPEED));
 // level 10
 L = 9
 BLOCK_BIN_MASK[L] = [
+    "---------------A---H",
+    "-----FFFFFFFFFFFFFFF",
+    "---------------D----",
     "--------------------",
     "--------------------",
+    "FFFFF----D-----FFFFF",
+    "H---F----------F-H--",
+    "----F----------F---H",
+    "---HF----------F----",
+    "BBBBFBBBBBBBBBBFBBBB",
+    "-----------------A--",
+    "--A-----------------",
     "--------------------",
-    "--------------------",
-    "--------------------",
-    "--------------------",
-    "--------------------",
-    "--------------------",
-    "--------------------",
-    "--------------------",
-    "--------------------",
-    "--------------------",
-    "--------------------",
-    "--------------------",
-    "--------------------",
-    "--------------------",
-    "--------------------",
-    "--------------------",
-    "--------------------",
-    "--------------------"
+    "FFFFFFFFBBBBFFFFFFFF",
+    "---B------------B---",
+    "A--B------------B-A-",
+    "---B------------B---",
+    "FFFFBBBFFFFFBBBFFFFF",
+    "-M------------------",
+    "FFFFFFFFFFFFFFFFFFFF"
 ];
 
+TIME_REMAIN_ALL[L] = 90;
 
+catNums = [0];
+catNums.forEach(i => addCatInfo(CAT_TYPES[L], i, "pathFinding"));
+catNums.forEach(i => addCatInfo(CAT_PARAMS[L], i, BASIC_SPEED));
+catNums = [1, 2];
+catNums.forEach(i => addCatInfo(CAT_TYPES[L], i, "basicFast"));
+catNums.forEach(i => addCatInfo(CAT_PARAMS[L], i, BASIC_SPEED));
+catNums = [3, 4];
+catNums.forEach(i => addCatInfo(CAT_TYPES[L], i, "strong"));
+catNums.forEach(i => addCatInfo(CAT_PARAMS[L], i, BASIC_SPEED));
+
+addDenInfo(DEN_TYPES[L], 0, "basicFast");
+addDenInfo(DEN_PARAMS[L], 0, {"speed": "slow"});
+addDenInfo(DEN_TYPES[L], 1, "evasive");
+addDenInfo(DEN_PARAMS[L], 1, {"speed": "fast"});
 
 
 

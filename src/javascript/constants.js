@@ -17,11 +17,13 @@ const SYMBOL_BLOCK_FIXED = 'F';
 const SYMBOL_CHEESE = "H";
 const SYMBOL_CAT = "A";
 const SYMBOL_MOUSE = "M";
+const SYMBOL_DEN = "D";
 
 const ID_RANGE_BLOCK = [1, 400];
 const ID_RANGE_CHEESE = [401, 450];
 const ID_RANGE_CAT = [451, 500];
 const ID_RANGE_BLOCK_FIXED = [501, 900];
+const ID_RANGE_DEN = [901, 1000];
 
 const CAT_MOVE_BASIC_SLOW_MIN = 800;
 const CAT_MOVE_BASIC_SLOW_RANGE = 800;
@@ -32,7 +34,7 @@ const CAT_MOVE_BASIC_VERY_FAST_RANGE = 100;
 
 
 /* adjustable constants */
-const VAL_CHEESE = 30;
+const VAL_CHEESE = 50;
 const timeToScoreFactor = 0.2;
 
 const DETECT_RADIUS = 7;
@@ -56,6 +58,7 @@ const ASSET_PATH_CAT_PATH_FINDING = ASSET_DIR_IM + "cat_path_finding.png";
 const ASSET_PATH_CAT_EVASIVE = ASSET_DIR_IM + "cat_evasive.png";
 const ASSET_PATH_CAT_STRONG = ASSET_DIR_IM + "cat_strong.png";
 const ASSET_PATH_GRID = ASSET_DIR_IM + "play_grid.png";
+const ASSET_PATH_DEN = ASSET_DIR_IM + "cat_den.png";
 
 const ASSET_PATH_CAT_BASIC_AUD = [1, 2, 3, 4, 5, 6].map(
     n => ASSET_DIR_AUD + '383427__deleted-user-7146007__cat-meow-meowing-' + n + '.wav'
