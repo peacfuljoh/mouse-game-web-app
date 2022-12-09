@@ -32,6 +32,9 @@ const CAT_MOVE_BASIC_FAST_RANGE = 200;
 const CAT_MOVE_BASIC_VERY_FAST_MIN = 350;
 const CAT_MOVE_BASIC_VERY_FAST_RANGE = 100;
 
+/* miscellaneous constants */
+const SQRT2 = 1.41421356237;
+
 
 /* adjustable constants */
 const VAL_CHEESE = 50;

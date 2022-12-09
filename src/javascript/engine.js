@@ -307,26 +307,13 @@ class Objects {
     }
     canPush(next_pos, dir_) {
         let canPush_ = false;
-        let i = next_pos[0];
-        let j = next_pos[1];
+        let [i, j] = next_pos;
         let increment;
         switch(dir_) {
-            case "up": {
-                increment = function() { i--; };
-                break;
-            }
-            case "right": {
-                increment = function() { j++; };
-                break;
-            }
-            case "down": {
-                increment = function() { i++; };
-                break;
-            }
-            case "left": {
-                increment = function() { j--; };
-                break;
-            }
+            case "up":    increment = function() { i--; }; break;
+            case "right": increment = function() { j++; }; break;
+            case "down":  increment = function() { i++; }; break;
+            case "left":  increment = function() { j--; }; break;
         }
         while (!canPush_ &&
                 (i >= 0 && i <= GRIDSIZE[0] - 1 && j >= 0 && j <= GRIDSIZE[1] - 1) &&
@@ -350,11 +337,10 @@ class Objects {
     }
     freeCellsAround(pos) {
         let freePos = [];
-        for (let i = Math.max(0, pos[0] - 1); i <= Math.min(GRIDSIZE[0] - 1, pos[0] + 1); i++) {
-            for (let j = Math.max(0, pos[1] - 1); j <= Math.min(GRIDSIZE[1] - 1, pos[1] + 1); j++) {
-                if (!this.objMask[i][j]) {
-                    freePos.push([i, j]);
-                }
+        let [i_start, i_end, j_start, j_end] = getNeighborIdxLimits(pos);
+        for (let i = i_start; i <= i_end; i++) {
+            for (let j = j_start; j <= j_end; j++) {
+                if (!this.objMask[i][j]) { freePos.push([i, j]); }
             }
         }
         return freePos;
@@ -363,8 +349,7 @@ class Objects {
     // action methods
     pushObjects(next_pos, dir_) {
         let increment, cond, i_inc, j_inc;
-        let i = next_pos[0];
-        let j = next_pos[1];
+        let [i, j] = next_pos;
 
         // select controls based on push direction
         switch(dir_) {
@@ -405,10 +390,7 @@ class Objects {
         } while (i >= 0 && i <= GRIDSIZE[0] - 1 && j >= 0 && j <= GRIDSIZE[1] - 1);
 
         // handle cheese getting crushed
-        if (this.hasCheese([i, j])) {
-            this.objMask[i][j] = 0;
-            this.draw();
-        }
+        if (this.hasCheese([i, j])) { this.remove([i, j]); }
 
         // move blocks away in reverse distance-from-mouse order
         while (cond()) {
@@ -596,9 +578,7 @@ function go_to_level(lvl) {
     update_score();
 
     // determine level
-    if (lvl <= MAX_LVL) { // next level
-        LVL = lvl;
-    }
+    if (lvl <= MAX_LVL) { LVL = lvl; } // next level
     else { // game finish
         game_over("win");
         return;
@@ -924,22 +904,13 @@ function getCatMoveDurVeryFast() {
 
 function getNextCatPosChaseBasic(mousePos, catPos, freePos, mode="chase") {
     let dirVec = (mode == "chase") ? subVec(mousePos, catPos) : subVec(catPos, mousePos);
-    let innerProd = [];
-    let val;
-    let maxVal = -2;
-    for (const [n, vec] of freePos.entries()) {
-        val = innerProdNormalized(subVec(vec, catPos), dirVec);
-        if (val > maxVal) {
-            maxVal = val;
-            i = n;
-        }
-    }
-    return i;
+    let innerProds = freePos.map(vec => innerProdNormalized(subVec(vec, catPos), dirVec));
+    return innerProds.indexOf(Math.max(...innerProds));
 }
 
 /*  CAT MOVEMENT: PATHFINDING */
 function catMoveFuncPathFinding(n, tgtPos, freePos, avoidPos=null) {
-    let i, j, newHeadNodes, nextIndex;
+    let i, j, newHeadNodes, nextIndex, costs;
 
     // init free space mask (0 = occupied, 1 = free, node = node)
     const dMask = objectsInfo.objMask.map(function f_row(row) {
@@ -968,22 +939,15 @@ function catMoveFuncPathFinding(n, tgtPos, freePos, avoidPos=null) {
         }
 
         // choose lowest-cost node from active list
-        nextIndex = 0;
-        for (i = 0; i < nodeList.length; i++) {
-            if (nodeList[i].cost < nodeList[nextIndex].cost) {
-                nextIndex = i;
-            }
-        }
-        i = nodeList[nextIndex].pos[0];
-        j = nodeList[nextIndex].pos[1];
+        costs = nodeList.map(node_ => node_.cost);
+        nextIndex = costs.indexOf(Math.min(...costs));
+        [i, j] = nodeList[nextIndex].pos;
         nodeList.splice(nextIndex, 1); // remove from list
 
         // check for mouse and backtrack, otherwise expand
         if (tgtPos[0] == i && tgtPos[1] == j) {
             node = dMask[i][j];
-            while (node.parent.parent != null) {
-                node = node.parent;
-            }
+            while (node.parent.parent != null) { node = node.parent; }
             cat["params"]["speed"] = "fast";
             meow(n, 0.90);
             deAllocateDMask(dMask);
@@ -999,9 +963,7 @@ function catMoveFuncPathFinding(n, tgtPos, freePos, avoidPos=null) {
 function deAllocateDMask(d){
     for (let i = 0; i < GRIDSIZE[0]; i++) {
         for (let j = 0; j < GRIDSIZE[1]; j++) {
-            if (d[i][j] instanceof PathFindingNode) {
-                delete d[i][j];
-            }
+            if (d[i][j] instanceof PathFindingNode) { delete d[i][j]; }
         }
     }
 }
@@ -1014,7 +976,7 @@ class PathFindingNode {
     }
     expand(mask) {
         let i, j, costMove, newNode;
-        let [i_start, i_end, j_start, j_end] = getExpandIdxLimits(this.pos);
+        let [i_start, i_end, j_start, j_end] = getNeighborIdxLimits(this.pos);
         let newNodes = [];
         for (i = i_start; i <= i_end; i++) {
             for (j = j_start; j <= j_end; j++) {
@@ -1037,16 +999,8 @@ class PathFindingNode {
     }
 }
 
-function getExpandIdxLimits(pos) {
-    let i_start = (pos[0] == 0) ? 0 : pos[0] - 1;
-    let i_end = (pos[0] == GRIDSIZE[0] - 1) ? GRIDSIZE[0] - 1 : pos[0] + 1;
-    let j_start = (pos[1] == 0) ? 0 : pos[1] - 1;
-    let j_end = (pos[1] == GRIDSIZE[1] - 1) ? GRIDSIZE[1] - 1 : pos[1] + 1;
-    return [i_start, i_end, j_start, j_end];
-}
-
 function getCatMoveCost(x, y) {
-    return (x[0] == y[0] || x[1] == y[1]) ? 1.0 : 1.41421356237; // sqrt(2)
+    return (x[0] == y[0] || x[1] == y[1]) ? 1.0 : SQRT2; // sqrt(2)
 }
 
 function setCatMovePathFinding(n) {
@@ -1077,7 +1031,7 @@ function catMoveFuncEvasive(n, tgtPos, freePos) {
     dMask[catPos[0]][catPos[1]] = 0;
     while (posList.length) {
         let pos = posList.shift();
-        let [i_start, i_end, j_start, j_end] = getExpandIdxLimits(pos);
+        let [i_start, i_end, j_start, j_end] = getNeighborIdxLimits(pos);
         for (i = i_start; i <= i_end; i++) {
             for (j = j_start; j <= j_end; j++) {
                 if (dMask[i][j]) {
@@ -1090,12 +1044,8 @@ function catMoveFuncEvasive(n, tgtPos, freePos) {
     }
 
     // identify cell furthest from mouse
-    scores = [];
-    for (pos of reachableCells) {
-        scores.push(distEuclidean(pos, tgtPos));
-    }
-    maxVal = Math.max(...scores);
-    i = scores.indexOf(maxVal);
+    scores = reachableCells.map(pos => distEuclidean(pos, tgtPos));
+    i = scores.indexOf(Math.max(...scores));
     newTgtPos = reachableCells[i];
 
     // find next move towards new target cell
@@ -1132,7 +1082,7 @@ function catMoveFuncStrong(n, mousePos, freePos) {
 
     // all possible moves (blocked or unblocked)
     let allPos = [];
-    let [i_start, i_end, j_start, j_end] = getExpandIdxLimits(catPos);
+    let [i_start, i_end, j_start, j_end] = getNeighborIdxLimits(catPos);
     for (let i = i_start; i <= i_end; i++) {
         for (let j = j_start; j <= j_end; j++) {
             if (!(i == catPos[0] && j == catPos[1])) { allPos.push([i, j]); }
