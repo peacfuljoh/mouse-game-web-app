@@ -42,7 +42,7 @@ class Mouse {
                 }
             }
         }
-        this.dir = 0;
+        this.dir = 0; // (0, 1, 2, 3 for 'up', 'down', 'right', 'left')
         this.updateIcon();
         this.isAlive = true;
     }
@@ -834,22 +834,10 @@ function catMoveFuncGeneral(n) {
         let newPos;
         switch(cat["type"]) {
             case "basic":
-            case "basicFast": {
-                newPos = catMoveFuncBasic(n, freePos);
-                break;
-            }
-            case "pathFinding": {
-                newPos = catMoveFuncPathFinding(n, mouseInfo.pos, freePos);
-                break;
-            }
-            case "evasive": {
-                newPos = catMoveFuncEvasive(n, mouseInfo.pos, freePos);
-                break;
-            }
-            case "strong": {
-                newPos = catMoveFuncStrong(n, mouseInfo.pos, freePos);
-                break;
-            }
+            case "basicFast":   newPos = catMoveFuncBasic(n, freePos); break;
+            case "pathFinding": newPos = catMoveFuncPathFinding(n, mouseInfo.pos, freePos); break;
+            case "evasive":     newPos = catMoveFuncEvasive(n, mouseInfo.pos, freePos); break;
+            case "strong":      newPos = catMoveFuncStrong(n, mouseInfo.pos, freePos); break;
         }
         if (newPos) { objectsInfo.move(catPos[0], catPos[1], newPos[0], newPos[1]); }
         return true;
@@ -919,7 +907,7 @@ function catMoveFuncPathFinding(n, tgtPos, freePos, avoidPos=null) {
         });
     });
     if (avoidPos != null && !GAME_OVER) {
-        for (pos of avoidPos) {
+        for (const pos of avoidPos) {
             dMask[pos[0]][pos[1]] = 0;
         }
     }
